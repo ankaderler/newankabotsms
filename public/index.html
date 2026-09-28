@@ -31,12 +31,10 @@
             border: 1px solid var(--border-gold); 
             margin-bottom: 25px; 
             box-shadow: 0 15px 40px rgba(212, 175, 55, 0.15); 
-            position: relative;
         }
         h1 { color: var(--gold-light); margin: 0 0 10px 0; font-size: 2.4rem; text-shadow: 0 2px 10px rgba(212,175,55,0.3); }
         p { color: #d6d3d1; margin: 0; font-size: 1.05rem; }
         
-        /* Cüzdan / Bakiye Alanı */
         .wallet-bar {
             display: flex;
             justify-content: space-between;
@@ -71,8 +69,12 @@
             border-left: 5px solid var(--gold-primary); 
             text-align: left; 
             border: 1px solid var(--border-gold); 
+            cursor: pointer;
+            transition: background 0.2s;
         }
+        .iban-box:hover { background: rgba(212, 175, 55, 0.1); }
         .iban-box b { color: var(--gold-light); }
+        
         .category-title { 
             color: var(--gold-light); 
             border-bottom: 2px solid var(--border-gold); 
@@ -117,6 +119,7 @@
         .payment-info-box { background: #0c0a09; padding: 18px; border-radius: 12px; border: 1px dashed var(--gold-primary); margin-bottom: 20px; font-size: 0.95rem; color: #e7e5e4; }
         .result-box { background: #0c0a09; padding: 18px; border-radius: 12px; border: 1px solid var(--gold-light); color: var(--gold-light); margin-top: 15px; text-align: center; font-weight: 500; word-break: break-all; }
         .support-link { color: var(--gold-light); text-decoration: underline; font-weight: bold; }
+        .copy-alert { position: fixed; bottom: 20px; right: 20px; background: var(--gold-primary); color: #0c0a09; padding: 12px 20px; border-radius: 8px; font-weight: bold; display: none; z-index: 2000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
@@ -124,14 +127,14 @@
         <header>
             <h1>🦅 ANKA VIP - Premium Medya & SMS Paneli</h1>
             <p>Kesintisiz ve Güvenli Sosyal Medya & Numara Çözümleri</p>
-            <div class="iban-box">
-                <strong>💳 Para Yatırılacak IBAN Adresi:</strong><br>
-                • Alıcı: <b>Resul Sakal</b> | IBAN: <b>TR62 0006 2000 5000 0006 8107 73</b><br>
+            <div class="iban-box" onclick="copyIban()" title="Kopyalamak için tıklayın">
+                <strong>💳 Garanti BBVA IBAN (Kopyalamak için tıkla):</strong><br>
+                • Alıcı: <b>Resul Sakal</b><br>
+                • IBAN: <span id="ibanText">TR62 0006 2000 5000 0006 8107 73</span><br>
                 • Destek: <a href="https://t.me/SMSPATRONUM" target="_blank" style="color:var(--gold-light);">@SMSPATRONUM</a>
             </div>
         </header>
 
-        <!-- Bakiye Cüzdan Çubuğu -->
         <div class="wallet-bar">
             <div class="wallet-info">
                 Hesap Bakiyeniz: <b id="userBalance">0.00 TL</b>
@@ -142,7 +145,7 @@
         <div id="product-list"></div>
     </div>
 
-    <!-- Sipariş / Satın Al Modal -->
+    <!-- Sipariş Modal -->
     <div id="orderModal" class="modal">
         <div class="modal-content">
             <h3 id="modalTitle" style="color: var(--gold-light); margin-top:0;">Sipariş Ekranı</h3>
@@ -168,19 +171,25 @@
         <div class="modal-content">
             <h3 style="color: var(--gold-light); margin-top:0;">💳 Hesaba Bakiye Yükle</h3>
             <div class="payment-info-box">
-                • IBAN: <b>TR62 0006 2000 5000 0006 8107 73 (Resul Sakal)</b><br>
-                • Açıklama kısmına Telegram kullanıcı adınızı yazarak havale/EFT yapın.
+                • Garanti IBAN: <b>TR62 0006 2000 5000 0006 8107 73 (Resul Sakal)</b><br>
+                • Havale/EFT yaptıktan sonra aşağıdaki bilgileri eksiksiz doldurun.
             </div>
+            
             <label style="font-size:0.9rem; color:#d6d3d1;"><b>Yatırılan Tutar (TL):</b></label>
             <input type="number" id="depositAmount" placeholder="Örn: 200">
             
+            <label style="font-size:0.9rem; color:#d6d3d1;"><b>Gönderen Adı Soyadı (Garanti Hesabınızdaki):</b></label>
+            <input type="text" id="depositSenderName" placeholder="Örn: Zeynep Akkaş">
+
             <label style="font-size:0.9rem; color:#d6d3d1;"><b>Telegram Kullanıcı Adınız (@kullaniciadi):</b></label>
             <input type="text" id="depositContact" placeholder="@telegramadi">
 
-            <button type="button" class="btn" onclick="submitDeposit()">Bakiye Bildirimi Gönder</button>
+            <button type="button" class="btn" onclick="submitDeposit()">200 TL Bakiye Bildirimi Gönder</button>
             <button type="button" onclick="closeDepositModal()" style="background:#292524; color:#d6d3d1; border:1px solid var(--border-gold); padding:12px; width:100%; border-radius:10px; margin-top:12px; cursor:pointer; font-weight:bold;">İptal</button>
         </div>
     </div>
+
+    <div id="copyAlert" class="copy-alert">📋 IBAN Panoya Kopyalandı!</div>
 
     <script>
         let allProducts = [];
@@ -193,6 +202,13 @@
             allProducts = data.products;
             renderProducts();
         });
+
+        function copyIban() {
+            navigator.clipboard.writeText('TR620006200050000006810773');
+            const alertBox = document.getElementById('copyAlert');
+            alertBox.style.display = 'block';
+            setTimeout(() => { alertBox.style.display = 'none'; }, 2000);
+        }
 
         function renderProducts() {
             const container = document.getElementById('product-list');
@@ -211,7 +227,7 @@
                             </div>
                             <div>
                                 <div class="price">${p.price} TL</div>
-                                <button class="btn" onclick="openModal('${pJson}')">Satın Al</button>
+                                <button class="btn" onclick="openModal('${pJson}')">Bakiyeden Satın Al</button>
                             </div>
                         </div>
                     `;
@@ -223,11 +239,19 @@
 
         function openModal(productStr) {
             selectedProductData = JSON.parse(decodeURIComponent(productStr));
+            
+            // Eğer bakiye yetersizse direkt bakiye yükleme ekranına yönlendir
+            if (userBalance < selectedProductData.price) {
+                alert('⚠️ Bakiyeniz yetersiz! Lütfen önce bakiye yükleyin.');
+                openDepositModal();
+                return;
+            }
+
             document.getElementById('modalTitle').innerText = selectedProductData.name;
             document.getElementById('modalDetailsText').innerHTML = `
                 • Ürün: <b style="color:var(--gold-light);">${selectedProductData.name}</b><br>
-                • Fiyat: <b style="color:var(--gold-light);">${selectedProductData.price} TL</b><br>
-                • Mevcut Bakiyeniz: <b style="color:var(--gold-light);">${userBalance.toFixed(2)} TL</b>
+                • Tutar: <b style="color:var(--gold-light);">${selectedProductData.price} TL</b><br>
+                • Güncel Bakiyeniz: <b style="color:var(--gold-light);">${userBalance.toFixed(2)} TL</b>
             `;
 
             const targetContainer = document.getElementById('targetFieldContainer');
@@ -246,16 +270,27 @@
         }
 
         function closeModal() { document.getElementById('orderModal').style.display = 'none'; }
-        
         function openDepositModal() { document.getElementById('depositModal').style.display = 'flex'; }
         function closeDepositModal() { document.getElementById('depositModal').style.display = 'none'; }
 
         async function submitDeposit() {
             const amount = document.getElementById('depositAmount').value;
+            const senderName = document.getElementById('depositSenderName').value.trim();
             const contact = document.getElementById('depositContact').value.trim();
-            if(!amount || !contact) { alert('Lütfen tüm alanları doldurun!'); return; }
+            
+            if(!amount || !senderName || !contact) { 
+                alert('Lütfen tüm alanları eksiksiz doldurun!'); 
+                return; 
+            }
 
-            alert('Bakiye talebiniz yöneticimize iletildi. Onaylandığında bakiyeniz yüklenecektir.');
+            // Telegram botuna bildirim gönderme isteği
+            await fetch('/api/deposit-notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount, senderName, customerContact: contact })
+            });
+
+            alert('✅ Bakiye bildiriminiz Garanti hesabınızla eşleştirilmek üzere yönetici botuna iletildi.');
             closeDepositModal();
         }
 
@@ -266,11 +301,6 @@
             if(!contact || (selectedProductData.category !== 'SMSOnay' && !target)) { 
                 alert('Lütfen gerekli alanları doldurun!'); 
                 return; 
-            }
-
-            if(userBalance < selectedProductData.price) {
-                alert('Bakiyeniz yetersiz! Lütfen önce "Bakiye Yükle" butonunu kullanın.');
-                return;
             }
 
             const payBtn = document.getElementById('payButton');
@@ -296,7 +326,7 @@
                 if(data.phoneNumber) {
                     resultSec.innerHTML = `<div class="result-box">✅ İşlem Başarılı!<br><br>📞 <b>Numaranız: +${data.phoneNumber}</b></div>`;
                 } else {
-                    resultSec.innerHTML = `<div class="result-box">✅ Siparişiniz alındı ve işleme konuldu!</div>`;
+                    resultSec.innerHTML = `<div class="result-box">✅ Satın alım onaylandı ve işleme konuldu!</div>`;
                 }
             } else {
                 resultSec.innerHTML = `<div class="result-box" style="border-color:#ef4444; color:#ef4444;">⚠️ Hata: ${data.message || 'Stok bulunamadı'}<br><br>Destek: <a href="https://t.me/SMSPATRONUM" target="_blank" class="support-link">@SMSPATRONUM</a></div>`;
