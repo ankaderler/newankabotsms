@@ -54,7 +54,6 @@ app.post('/api/deposit-notify', async (req, res) => {
 // Sipariş ve SMS API Entegrasyonu
 app.post('/api/order', async (req, res) => {
     const { product, target, customerContact } = req.body;
-
     let phoneNumber = null;
 
     if (product.category === 'SMSOnay' && product.serviceCode) {
@@ -83,29 +82,12 @@ app.post('/api/order', async (req, res) => {
                      (phoneNumber ? `📞 Sağlanan Numara: +\`${phoneNumber}\`` : '');
 
     await sendTelegramMessage(adminMsg);
-
     res.json({ success: true, phoneNumber: phoneNumber });
-});
-
-app.post('/api/webhook/sms', async (req, res) => {
-    const payload = req.body;
-    if (payload && payload.code) {
-        const smsMsg = `📩 *SMS ONAY KODU GELDİ!*\n\n` +
-                       `📱 Numara: \`+${payload.phone || payload.phoneNumber}\`\n` +
-                       `🔑 Kod: *${payload.code}*\n` +
-                       `⚙️ Servis: ${payload.service}`;
-        await sendTelegramMessage(smsMsg);
-    }
-    res.json({ status: 'received' });
 });
 
 async function sendTelegramMessage(text, replyMarkup = null) {
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-    const body = {
-        chat_id: ADMIN_CHAT_ID,
-        text: text,
-        parse_mode: 'Markdown'
-    };
+    const body = { chat_id: ADMIN_CHAT_ID, text: text, parse_mode: 'Markdown' };
     if (replyMarkup) body.reply_markup = replyMarkup;
 
     await fetch(url, {
@@ -115,90 +97,109 @@ async function sendTelegramMessage(text, replyMarkup = null) {
     });
 }
 
-// 4K ANKA KUŞU Görsel Destekli Elit Arayüz
+// 4K ANKA KUŞU TAM EKRAN ANİMASYONLU ARAYÜZ
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🦅 ANKA SERVİS - 4K Elite Digital Solutions</title>
+    <title>🦅 ANKA SERVİS - 4K Elite Phoenix Edition</title>
     <style>
         :root { 
-            --bg-color: #050505; 
+            --bg-color: #030303; 
             --gold-primary: #d4af37; 
             --gold-light: #fef08a; 
-            --card-bg: rgba(14, 14, 14, 0.92); 
+            --card-bg: rgba(12, 12, 12, 0.95); 
             --text-main: #f5f5f4; 
             --border-gold: rgba(212, 175, 55, 0.5); 
         }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: linear-gradient(rgba(5,5,5,0.85), rgba(5,5,5,0.92)), url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2000&auto=format&fit=crop') no-repeat center center fixed;
-            background-size: cover;
+            background: #030303;
             color: var(--text-main); 
             margin: 0; 
             padding: 20px; 
             min-height: 100vh;
+            overflow-x: hidden;
         }
         
-        /* 4K ANKA KUŞU SPLASH (AÇILIŞ) EKRANI */
+        /* 4K TAM EKRAN ANKA KUŞU AÇILIŞ / KANATLANMA EKRANI */
         #splashScreen {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #030303 url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=2000&auto=format&fit=crop') no-repeat center center;
-            background-size: cover;
-            background-blend-mode: overlay;
-            z-index: 9999;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #000;
+            z-index: 99999;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            transition: opacity 1s ease, visibility 1s ease;
-        }
-        .phoenix-img-container {
-            width: 180px;
-            height: 180px;
-            border-radius: 50%;
-            border: 3px solid var(--gold-primary);
             overflow: hidden;
-            box-shadow: 0 0 40px rgba(212, 175, 55, 0.8);
-            animation: phoenixPulse 2.5s infinite alternate ease-in-out;
+            transition: opacity 1.2s ease, visibility 1.2s ease;
         }
-        .phoenix-img-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+        .splash-bg-phoenix {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2560&auto=format&fit=crop') no-repeat center center;
+            background-size: cover;
+            filter: brightness(0.6) contrast(1.2);
+            animation: phoenixFlyZoom 3.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+        @keyframes phoenixFlyZoom {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(1.18); opacity: 1; }
+        }
+        .splash-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            animation: fadeInText 2s ease-in-out;
+        }
+        .phoenix-mega-avatar {
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            border: 4px solid var(--gold-light);
+            box-shadow: 0 0 70px rgba(212, 175, 55, 0.9), inset 0 0 30px rgba(254, 240, 138, 0.8);
+            margin: 0 auto 20px auto;
+            background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop') no-repeat center center;
+            background-size: cover;
+            animation: wingFlapPulse 2s infinite alternate ease-in-out;
+        }
+        @keyframes wingFlapPulse {
+            0% { transform: scale(0.92) rotate(-2deg); box-shadow: 0 0 40px rgba(212, 175, 55, 0.6); }
+            100% { transform: scale(1.06) rotate(2deg); box-shadow: 0 0 80px rgba(254, 240, 138, 1); }
         }
         .splash-title {
             color: var(--gold-light);
-            font-size: 2.5rem;
-            font-weight: 800;
-            letter-spacing: 4px;
-            margin-top: 20px;
-            text-shadow: 0 0 20px rgba(212, 175, 55, 0.7);
+            font-size: 3rem;
+            font-weight: 900;
+            letter-spacing: 6px;
+            text-shadow: 0 0 30px rgba(212, 175, 55, 0.9);
+            margin: 0;
         }
         .splash-sub {
-            color: #d6d3d1;
-            font-size: 1.1rem;
-            margin-top: 5px;
-            letter-spacing: 2px;
+            color: #e7e5e4;
+            font-size: 1.2rem;
+            letter-spacing: 3px;
+            margin-top: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
         }
-        @keyframes phoenixPulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 25px rgba(212, 175, 55, 0.5); }
-            100% { transform: scale(1.05); box-shadow: 0 0 50px rgba(254, 240, 138, 0.9); }
+        @keyframes fadeInText {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
 
-        .container { max-width: 1050px; margin: 0 auto; }
+        .container { max-width: 1050px; margin: 0 auto; position: relative; z-index: 1; }
         header { 
             text-align: center; 
             padding: 30px 20px; 
-            background: rgba(18, 16, 14, 0.9); 
-            backdrop-filter: blur(10px);
+            background: rgba(14, 12, 10, 0.92); 
+            backdrop-filter: blur(12px);
             border-radius: 20px; 
             border: 1px solid var(--border-gold); 
             margin-bottom: 25px; 
-            box-shadow: 0 15px 40px rgba(212, 175, 55, 0.2); 
+            box-shadow: 0 15px 40px rgba(212, 175, 55, 0.25); 
         }
         h1 { color: var(--gold-light); margin: 0 0 10px 0; font-size: 2.3rem; text-shadow: 0 2px 10px rgba(212,175,55,0.4); }
         p { color: #d6d3d1; margin: 0; font-size: 1rem; }
@@ -217,7 +218,7 @@ app.get('/', (req, res) => {
             border: 1px solid var(--gold-primary);
             width: 100%;
             max-width: 420px;
-            box-shadow: 0 20px 60px rgba(212,175,55,0.3);
+            box-shadow: 0 20px 60px rgba(212,175,55,0.35);
             text-align: center;
         }
         .auth-box h2 { color: var(--gold-light); margin-top: 0; }
@@ -229,18 +230,19 @@ app.get('/', (req, res) => {
         }
         .auth-tab {
             flex: 1;
-            padding: 10px;
+            padding: 12px;
             background: none;
             border: none;
             color: #a8a29e;
             font-weight: bold;
             cursor: pointer;
-            font-size: 1rem;
+            font-size: 1.05rem;
             transition: 0.3s;
         }
         .auth-tab.active {
             color: var(--gold-light);
             border-bottom: 3px solid var(--gold-primary);
+            text-shadow: 0 0 10px rgba(212,175,55,0.5);
         }
 
         .wallet-bar {
@@ -346,25 +348,22 @@ app.get('/', (req, res) => {
 </head>
 <body>
 
-    <!-- 4K ANKA KUŞU AÇILIŞ ANİMASYONU -->
+    <!-- 4K TAM EKRAN ANKA KUŞU AÇILIŞ ANİMASYONU -->
     <div id="splashScreen">
-        <div class="phoenix-img-container">
-            <img src="https://i.ibb.co/3ykB94m/anka.jpg" alt="Anka Kuşu">
+        <div class="splash-bg-phoenix"></div>
+        <div class="splash-content">
+            <div class="phoenix-mega-avatar"></div>
+            <div class="splash-title">ANKA SERVİS</div>
+            <div class="splash-sub">4K Elite Phoenix Edition • Yükleniyor...</div>
         </div>
-        <div class="splash-title">ANKA SERVİS</div>
-        <div class="splash-sub">Elite Digital Solutions • 4K Edition</div>
     </div>
 
     <div class="container">
         
-        <!-- GİRİŞ / KAYIT EKRANI (SEKMELİ) -->
+        <!-- GİRİŞ / KAYIT EKRANI -->
         <div id="authScreen" class="auth-wrapper" style="display:none;">
             <div class="auth-box">
-                <div style="display:flex; justify-content:center; margin-bottom:15px;">
-                    <div style="width:70px; height:70px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; box-shadow:0 0 15px rgba(212,175,55,0.5);">
-                        <img src="https://i.ibb.co/3ykB94m/anka.jpg" style="width:100%; height:100%; object-fit:cover;" alt="Logo">
-                    </div>
-                </div>
+                <div style="width:70px; height:70px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin:0 auto 15px auto; box-shadow:0 0 20px rgba(212,175,55,0.6); background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop') no-repeat center center; background-size: cover;"></div>
                 <h2>🦅 ANKA VIP Panel</h2>
                 
                 <div class="auth-tabs">
@@ -387,9 +386,7 @@ app.get('/', (req, res) => {
         <!-- ANA PANEL EKRANI -->
         <div id="panelScreen" style="display:none;">
             <header>
-                <div style="display:inline-block; width:60px; height:60px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin-bottom:10px; box-shadow:0 0 15px rgba(212,175,55,0.4);">
-                    <img src="https://i.ibb.co/3ykB94m/anka.jpg" style="width:100%; height:100%; object-fit:cover;" alt="Logo">
-                </div>
+                <div style="display:inline-block; width:65px; height:65px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin-bottom:10px; box-shadow:0 0 20px rgba(212,175,55,0.5); background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop') no-repeat center center; background-size: cover;"></div>
                 <h1>🦅 ANKA SERVİS - Elite Panel</h1>
                 <p>Güvenli Sosyal Medya & Otomatik Numara Çözümleri</p>
                 <div class="iban-box" onclick="copyIban()" title="Kopyalamak için tıklayın">
@@ -463,18 +460,18 @@ app.get('/', (req, res) => {
     <div id="copyAlert" class="copy-alert">📋 IBAN Panoya Kopyalandı!</div>
 
     <script>
-        // 2 saniye sonra 4K Anka Kuşu açılış ekranını kaldır
+        // 3 saniye ihtişamlı 4K Anka uçuş animasyonundan sonra paneli göster
         setTimeout(() => {
             const splash = document.getElementById('splashScreen');
             splash.style.opacity = '0';
             splash.style.visibility = 'hidden';
             checkUserSession();
-        }, 2000);
+        }, 3000);
 
         let allProducts = [];
         let selectedProductData = null;
         let currentUser = localStorage.getItem('anka_current_user');
-        let currentAuthMode = 'login'; // 'login' veya 'register'
+        let currentAuthMode = 'login';
 
         function checkUserSession() {
             if (!currentUser) {
@@ -528,7 +525,6 @@ app.get('/', (req, res) => {
                 return;
             }
 
-            // Login modu
             if (!savedPass) {
                 errBox.innerText = 'Böyle bir hesap bulunamadı! Önce Kayıt Olun.';
                 errBox.style.display = 'block';
@@ -719,5 +715,5 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 ANKA SERVİS 4K VIP Panel ${PORT} portunda başarıyla aktif!`);
+    console.log(`🚀 ANKA SERVİS 4K Phoenix VIP Panel ${PORT} portunda aktif!`);
 });
