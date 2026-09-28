@@ -33,26 +33,22 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ürün Kataloğu (SMS Onay ürünleri service ve country parametreleri ile işaretlendi)
+// Ürün Kataloğu
 const products = [
-  // Instagram Hizmetleri
   { id: 1, category: "Instagram", name: "1. Düşmeyen Takipçi (500 Adet)", price: 450, desc: "Yüksek kaliteli, düşüşe karşı korumalı özel Instagram takipçi." },
   { id: 2, category: "Instagram", name: "2. Türk Beğeni (500 Adet)", price: 200, desc: "Gerçek görünümlü Türk kullanıcılardan beğeni paketi." },
   { id: 3, category: "Instagram", name: "3. Gönderi İzlenme (10000 Adet)", price: 250, desc: "Keşfet etkili yüksek hacimli video/reels izlenmesi." },
   { id: 4, category: "Instagram", name: "4a. Ucuz Takipçi (100 Adet)", price: 120, desc: "Ekonomik başlangıç paketi." },
   { id: 5, category: "Instagram", name: "4b. Ucuz Takipçi (250 Adet)", price: 270, desc: "Ekonomik orta paket." },
 
-  // TikTok Hizmetleri
   { id: 6, category: "TikTok", name: "1. TikTok Takipçi (250 Adet)", price: 250, desc: "Aktif TikTok profil desteği." },
   { id: 7, category: "TikTok", name: "2. TikTok Beğeni (2500 Adet)", price: 300, desc: "Yüksek adetli TikTok video beğeni paketi." },
   { id: 8, category: "TikTok", name: "3a. TikTok İzlenme (100 Bin Adet)", price: 10000, desc: "Devasa kitleye ulaşmak için 100K izlenme." },
   { id: 9, category: "TikTok", name: "3b. TikTok İzlenme (25 Bin Adet)", price: 320, desc: "Popülerleşme odaklı 25K izlenme paketi." },
   { id: 10, category: "TikTok", name: "4. TikTok PK Puan Savaşı (250 Adet)", price: 100, desc: "Canlı yayınlar için 250 PK Puan desteği." },
 
-  // Telegram Hizmetleri
   { id: 11, category: "Telegram", name: "Telegram Abone Paketi (750 Adet)", price: 350, desc: "Kanal veya grup için kaliteli 750 üye." },
 
-  // SMS Onay / Numara Servisleri
   { id: 12, category: "SMSOnay", name: "🇺🇸 Telegram ABD Numara", price: 200, desc: "Anlık API üzerinden çekilen ABD Telegram numarası.", service: "tg", country: "usa" },
   { id: 13, category: "SMSOnay", name: "🇹🇷 Telegram TR Numara", price: 250, desc: "onaylasms.com.tr üzerinden Türkiye Telegram numarası.", service: "tg", country: "turkey" },
   { id: 14, category: "SMSOnay", name: "🇹🇷 WhatsApp TR Numara", price: 320, desc: "onaylasms.com.tr üzerinden Türkiye WhatsApp numarası.", service: "wa", country: "turkey" },
@@ -79,7 +75,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Yepyeni, Kusursuz Mavi VIP Web Paneli Arayüzü
+// Kusursuz Mavi VIP Web Paneli Arayüzü
 app.get('/index.html', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -142,11 +138,9 @@ app.get('/index.html', (req, res) => {
         <div id="orderModal" class="modal">
             <div class="modal-content">
                 <h3 id="modalTitle" style="color: var(--blue-glow); margin-top:0;">Ödeme ve Sipariş Ekranı</h3>
-                <div class="payment-info-box" id="modalDetailsText">
-                    <!-- Dinamik Ödeme Detayları -->
-                </div>
+                <div class="payment-info-box" id="modalDetailsText"></div>
                 <div id="formSection">
-                    <label><b>Telegram Kullanıcı Adınız (@kullaniciadi):</b></label>
+                    <label style="font-size:0.9rem; color:#cbd5e1;"><b>Telegram Kullanıcı Adınız (@kullaniciadi):</b></label>
                     <input type="text" id="customerContact" placeholder="@kullaniciadi" required>
                     <button type="button" class="btn" id="payButton" onclick="submitPayment()">Ödemeyi Yaptım</button>
                 </div>
@@ -193,14 +187,14 @@ app.get('/index.html', (req, res) => {
 
             function openModal(productStr) {
                 selectedProductData = JSON.parse(decodeURIComponent(productStr));
-                document.getElementById('modalTitle0').innerText = selectedProductData.name;
+                document.getElementById('modalTitle').innerText = selectedProductData.name;
                 
                 let detailsHTML = \`
-                    • Ürün / Hizmet: <b style="color:var(--blue-glow);">\${selectedProductData.name}</b><br>
+                    • Seçilen Ürün: <b style="color:var(--blue-glow);">\${selectedProductData.name}</b><br>
                     • Ödenecek Tutar: <b style="color:var(--blue-glow);">\${selectedProductData.price} TL</b><br>
                     • Alıcı Adı Soyadı: <b>Resul Sakal</b><br>
-                    • IBAN: <b style="color:var(--blue-glow);">TR62 0006 2000 5000 0006 8107 73</b><br><br>
-                    <span style="font-size:0.85rem; color:#94a3b8;">⚠️ Lütfen yukarıdaki tutarı IBAN'a gönderdikten sonra aşağıya kullanıcı adınızı yazıp <b>"Ödemeyi Yaptım"</b> butonuna basınız.</span>
+                    • IBAN Adresi: <b style="color:var(--blue-glow);">TR62 0006 2000 5000 0006 8107 73</b><br><br>
+                    <span style="font-size:0.85rem; color:#94a3b8;">⚠️ Lütfen tutarı yukarıdaki IBAN'a gönderdikten sonra kullanıcı adınızı girip <b>"Ödemeyi Yaptım"</b> butonuna basınız.</span>
                 \`;
                 document.getElementById('modalDetailsText').innerHTML = detailsHTML;
                 document.getElementById('customerContact').value = '';
@@ -243,9 +237,9 @@ app.get('/index.html', (req, res) => {
                     if(data.phoneNumber) {
                         resultSec.innerHTML = \`
                             <div class="result-box">
-                                ✅ Ödeme Bildirimi Alındı ve Numaranız Çekildi!<br><br>
+                                ✅ Ödemeniz Onaylandı ve Numaranız Verildi!<br><br>
                                 📞 <b>Numara: +\${data.phoneNumber}</b><br>
-                                <span style="font-size:0.85rem; color:#cbd5e1;">Lütfen bu numarayı ilgili uygulamada kullanın.</span>
+                                <span style="font-size:0.85rem; color:#cbd5e1;">Bu numarayı ilgili uygulamada kullanabilirsiniz.</span>
                             </div>
                         \`;
                     } else {
@@ -259,7 +253,7 @@ app.get('/index.html', (req, res) => {
                 } else {
                     resultSec.innerHTML = \`
                         <div class="result-box" style="border-color:#ef4444; color:#ef4444;">
-                            ⚠️ Bildirim iletildi ancak SMS API stok hatası alındı: \${data.message || 'Stok bulunamadı'}<br>
+                            ⚠️ Bildirim iletildi ancak stok hatası alındı: \${data.message || 'Stok bulunamadı'}<br>
                             Lütfen @SMSPATRONUM ile iletişime geçin.
                         </div>
                     \`;
@@ -275,13 +269,11 @@ app.get('/api/products', (req, res) => {
   res.json({ success: true, products });
 });
 
-// Sipariş / Ödeme Bildirimi ve Otomatik Numara Alma API'si
 app.post('/api/order', async (req, res) => {
   const { product, customerContact } = req.body;
   try {
     let phoneNumber = null;
 
-    // Eğer ürün bir SMS Onay servisi ise, butona basıldığı an API'den numarayı çek
     if (product.category === 'SMSOnay' && product.service && product.country) {
       const apiResult = await getNumberFromAPI(product.service, product.country);
       if (apiResult.success) {
@@ -289,7 +281,6 @@ app.post('/api/order', async (req, res) => {
       }
     }
 
-    // Admine Telegram üzerinden detaylı bildirim gönder
     const message = `🚨 *YENİ WEB ÖDEME BİLDİRİMİ!* 🚨\n\n` +
                     `📦 *Ürün:* ${product.name}\n` +
                     `💰 *Tutar:* ${product.price} TL\n` +
