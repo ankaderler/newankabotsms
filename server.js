@@ -12,7 +12,7 @@ const ADMIN_CHAT_ID = '8964930489';
 const ONAYLASMS_API_KEY = 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
 const ONAYLASMS_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
 
-// Ürün Veritabanı (SMS Onay servisleri OnaylaSMS API parametreleriyle eşleştirildi)
+// Ürün Veritabanı
 const products = [
     { id: 1, category: 'Telegram', name: 'Telegram Abone Paketi (750 Adet)', desc: 'Gerçek ve aktif Türk aboneler.', price: 150 },
     { id: 2, category: 'TikTok', name: 'TikTok Takipçi (250 Adet)', desc: 'Kaliteli ve düşmeyen takipçi.', price: 250 },
@@ -56,22 +56,17 @@ app.post('/api/order', async (req, res) => {
     const { product, target, customerContact } = req.body;
 
     let phoneNumber = null;
-    let apiError = null;
 
-    // Eğer ürün SMS Onay kategorisindeyse OnaylaSMS API'sine bağlan
     if (product.category === 'SMSOnay' && product.serviceCode) {
         try {
-            // OnaylaSMS API çağrısı (getNumber benzeri stubs yapısı)
             const apiUrl = `${ONAYLASMS_URL}?api_key=${ONYALASMS_API_KEY}&action=getNumber&service=${product.serviceCode}`;
             const apiRes = await fetch(apiUrl);
             const apiText = await apiRes.text();
 
-            // Genellikle bu tarz API'ler "ACCESS_NUMBER:activationId:phone" döner
             if (apiText.includes('ACCESS_NUMBER') || apiText.length > 10) {
                 const parts = apiText.split(':');
-                phoneNumber = parts[parts.length - 1] || '905514870276'; // Örnek fallback
+                phoneNumber = parts[parts.length - 1] || '905514870276';
             } else {
-                // API stok yok derse simüle edilmiş veya yedek numara üretilir ki müşteri mağdur olmasın
                 phoneNumber = '9055' + Math.floor(10000000 + Math.random() * 90000000);
             }
         } catch (err) {
@@ -85,18 +80,15 @@ app.post('/api/order', async (req, res) => {
                      `💵 Tutar: *${product.price} TL*\n` +
                      `🎯 Hedef: \`${target}\`\n` +
                      `✈️ İletişim: *${customerContact}*\n` +
-                     (phoneNumber ? `📞 Sağlanan Numara: +\`{phoneNumber}\`` : '');
+                     (phoneNumber ? `📞 Sağlanan Numara: +\`${phoneNumber}\`` : '');
 
     await sendTelegramMessage(adminMsg);
 
     res.json({ success: true, phoneNumber: phoneNumber });
 });
 
-// Webhook Alıcısı (OnaylaSMS'den gelecek SMS kodları için)
 app.post('/api/webhook/sms', async (req, res) => {
     const payload = req.body;
-    // { "activationId": "...", "service": "wa", "phone": "...", "code": "123456" }
-    
     if (payload && payload.code) {
         const smsMsg = `📩 *SMS ONAY KODU GELDİ!*\n\n` +
                        `📱 Numara: \`+${payload.phone || payload.phoneNumber}\`\n` +
@@ -104,7 +96,6 @@ app.post('/api/webhook/sms', async (req, res) => {
                        `⚙️ Servis: ${payload.service}`;
         await sendTelegramMessage(smsMsg);
     }
-    
     res.json({ status: 'received' });
 });
 
@@ -124,80 +115,92 @@ async function sendTelegramMessage(text, replyMarkup = null) {
     });
 }
 
-// VIP Arayüz ve Anka Kuşu Giriş Ekranı
+// 4K ANKA KUŞU Görsel Destekli Elit Arayüz
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🦅 ANKA SERVİS - Elite Digital Solutions</title>
+    <title>🦅 ANKA SERVİS - 4K Elite Digital Solutions</title>
     <style>
         :root { 
-            --bg-color: #070707; 
+            --bg-color: #050505; 
             --gold-primary: #d4af37; 
             --gold-light: #fef08a; 
-            --card-bg: rgba(18, 18, 18, 0.95); 
+            --card-bg: rgba(14, 14, 14, 0.92); 
             --text-main: #f5f5f4; 
-            --border-gold: rgba(212, 175, 55, 0.4); 
+            --border-gold: rgba(212, 175, 55, 0.5); 
         }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: radial-gradient(circle at center, #1a1714 0%, var(--bg-color) 100%); 
+            background: linear-gradient(rgba(5,5,5,0.85), rgba(5,5,5,0.92)), url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2000&auto=format&fit=crop') no-repeat center center fixed;
+            background-size: cover;
             color: var(--text-main); 
             margin: 0; 
             padding: 20px; 
             min-height: 100vh;
         }
         
-        /* GİRİŞ ANİMASYONU (SPLASH SCREEN) */
+        /* 4K ANKA KUŞU SPLASH (AÇILIŞ) EKRANI */
         #splashScreen {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: #050505;
+            background: #030303 url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=2000&auto=format&fit=crop') no-repeat center center;
+            background-size: cover;
+            background-blend-mode: overlay;
             z-index: 9999;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            transition: opacity 0.8s ease, visibility 0.8s ease;
+            transition: opacity 1s ease, visibility 1s ease;
         }
-        .phoenix-logo {
-            font-size: 5rem;
-            animation: flyPulse 2s infinite alternate ease-in-out;
-            filter: drop-shadow(0 0 25px rgba(212, 175, 55, 0.6));
+        .phoenix-img-container {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            border: 3px solid var(--gold-primary);
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(212, 175, 55, 0.8);
+            animation: phoenixPulse 2.5s infinite alternate ease-in-out;
+        }
+        .phoenix-img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
         .splash-title {
             color: var(--gold-light);
-            font-size: 2.2rem;
-            font-weight: bold;
-            letter-spacing: 3px;
-            margin-top: 15px;
-            text-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 4px;
+            margin-top: 20px;
+            text-shadow: 0 0 20px rgba(212, 175, 55, 0.7);
         }
         .splash-sub {
-            color: #a8a29e;
-            font-size: 1rem;
+            color: #d6d3d1;
+            font-size: 1.1rem;
             margin-top: 5px;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
         }
-        @keyframes flyPulse {
-            0% { transform: scale(0.9) translateY(0); filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.4)); }
-            50% { transform: scale(1.1) translateY(-15px); filter: drop-shadow(0 0 35px rgba(254, 240, 138, 0.8)); }
-            100% { transform: scale(0.9) translateY(0); filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.4)); }
+        @keyframes phoenixPulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 25px rgba(212, 175, 55, 0.5); }
+            100% { transform: scale(1.05); box-shadow: 0 0 50px rgba(254, 240, 138, 0.9); }
         }
 
         .container { max-width: 1050px; margin: 0 auto; }
         header { 
             text-align: center; 
             padding: 30px 20px; 
-            background: linear-gradient(135deg, #141210, #1f1b18); 
+            background: rgba(18, 16, 14, 0.9); 
+            backdrop-filter: blur(10px);
             border-radius: 20px; 
             border: 1px solid var(--border-gold); 
             margin-bottom: 25px; 
-            box-shadow: 0 15px 40px rgba(212, 175, 55, 0.15); 
+            box-shadow: 0 15px 40px rgba(212, 175, 55, 0.2); 
         }
-        h1 { color: var(--gold-light); margin: 0 0 10px 0; font-size: 2.2rem; text-shadow: 0 2px 10px rgba(212,175,55,0.3); }
+        h1 { color: var(--gold-light); margin: 0 0 10px 0; font-size: 2.3rem; text-shadow: 0 2px 10px rgba(212,175,55,0.4); }
         p { color: #d6d3d1; margin: 0; font-size: 1rem; }
         
         .auth-wrapper {
@@ -208,16 +211,38 @@ app.get('/', (req, res) => {
         }
         .auth-box {
             background: var(--card-bg);
-            padding: 40px;
+            backdrop-filter: blur(15px);
+            padding: 35px;
             border-radius: 20px;
             border: 1px solid var(--gold-primary);
             width: 100%;
             max-width: 420px;
-            box-shadow: 0 15px 50px rgba(212,175,55,0.25);
+            box-shadow: 0 20px 60px rgba(212,175,55,0.3);
             text-align: center;
         }
         .auth-box h2 { color: var(--gold-light); margin-top: 0; }
         
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-gold);
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            background: none;
+            border: none;
+            color: #a8a29e;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.3s;
+        }
+        .auth-tab.active {
+            color: var(--gold-light);
+            border-bottom: 3px solid var(--gold-primary);
+        }
+
         .wallet-bar {
             display: flex;
             justify-content: space-between;
@@ -227,7 +252,7 @@ app.get('/', (req, res) => {
             border-radius: 12px;
             border: 1px solid var(--gold-primary);
             margin-bottom: 25px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
             flex-wrap: wrap;
             gap: 10px;
         }
@@ -244,11 +269,11 @@ app.get('/', (req, res) => {
             cursor: pointer;
             transition: opacity 0.2s;
         }
-        .wallet-btn.logout { background: #292524; color: #f43f5e; border: 1px solid #f43f5e; }
+        .wallet-btn.logout { background: #1c1917; color: #f43f5e; border: 1px solid #f43f5e; }
         .wallet-btn:hover { opacity: 0.9; }
 
         .iban-box { 
-            background: rgba(12, 10, 9, 0.85); 
+            background: rgba(10, 9, 8, 0.9); 
             padding: 15px 20px; 
             border-radius: 14px; 
             margin-top: 20px; 
@@ -258,11 +283,11 @@ app.get('/', (req, res) => {
             cursor: pointer;
             font-size: 0.95rem;
         }
-        .iban-box:hover { background: rgba(212, 175, 55, 0.1); }
+        .iban-box:hover { background: rgba(212, 175, 55, 0.15); }
         .iban-box b { color: var(--gold-light); }
         
         .support-banner {
-            background: rgba(225, 29, 72, 0.1);
+            background: rgba(225, 29, 72, 0.12);
             border: 1px solid #f43f5e;
             padding: 12px;
             border-radius: 10px;
@@ -284,13 +309,14 @@ app.get('/', (req, res) => {
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
         .card { 
             background: var(--card-bg); 
+            backdrop-filter: blur(10px);
             border-radius: 16px; 
             padding: 22px; 
             border: 1px solid var(--border-gold); 
             display: flex; 
             flex-direction: column; 
             justify-content: space-between; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
         }
         .card h3 { margin-top: 0; color: #ffffff; font-size: 1.25rem; }
         .price { font-size: 1.6rem; color: var(--gold-light); font-weight: bold; margin: 15px 0; }
@@ -306,50 +332,64 @@ app.get('/', (req, res) => {
             display: block; 
             width: 100%; 
             font-size: 1rem;
-            box-shadow: 0 4px 15px rgba(212,175,55,0.3);
+            box-shadow: 0 4px 15px rgba(212,175,55,0.4);
         }
         .btn:hover { opacity: 0.9; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5,5,5,0.92); justify-content: center; align-items: center; z-index: 1000; padding: 15px; box-sizing: border-box; }
-        .modal-content { background: #141210; padding: 30px; border-radius: 18px; width: 100%; max-width: 450px; border: 1px solid var(--gold-primary); box-shadow: 0 15px 50px rgba(212,175,55,0.3); max-height: 90vh; overflow-y: auto; }
-        input { width: 100%; padding: 12px; margin: 8px 0 15px 0; background: #070707; border: 1px solid var(--border-gold); color: white; border-radius: 10px; box-sizing: border-box; font-size: 1rem; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(3,3,3,0.94); justify-content: center; align-items: center; z-index: 1000; padding: 15px; box-sizing: border-box; }
+        .modal-content { background: #12100e; padding: 30px; border-radius: 18px; width: 100%; max-width: 450px; border: 1px solid var(--gold-primary); box-shadow: 0 15px 50px rgba(212,175,55,0.4); max-height: 90vh; overflow-y: auto; }
+        input { width: 100%; padding: 12px; margin: 8px 0 15px 0; background: #050505; border: 1px solid var(--border-gold); color: white; border-radius: 10px; box-sizing: border-box; font-size: 1rem; }
         input:focus { outline: none; border-color: var(--gold-light); }
-        .payment-info-box { background: #070707; padding: 15px; border-radius: 12px; border: 1px dashed var(--gold-primary); margin-bottom: 15px; font-size: 0.9rem; color: #e7e5e4; }
-        .result-box { background: #070707; padding: 15px; border-radius: 12px; border: 1px solid var(--gold-light); color: var(--gold-light); margin-top: 15px; text-align: center; font-weight: 500; font-size: 1.1rem; }
-        .copy-alert { position: fixed; bottom: 20px; right: 20px; background: var(--gold-primary); color: #0c0a09; padding: 12px 20px; border-radius: 8px; font-weight: bold; display: none; z-index: 2000; box-shadow: 0 5px 20px rgba(0,0,0,0.5); }
+        .payment-info-box { background: #050505; padding: 15px; border-radius: 12px; border: 1px dashed var(--gold-primary); margin-bottom: 15px; font-size: 0.9rem; color: #e7e5e4; }
+        .result-box { background: #050505; padding: 15px; border-radius: 12px; border: 1px solid var(--gold-light); color: var(--gold-light); margin-top: 15px; text-align: center; font-weight: 500; font-size: 1.1rem; }
+        .copy-alert { position: fixed; bottom: 20px; right: 20px; background: var(--gold-primary); color: #0c0a09; padding: 12px 20px; border-radius: 8px; font-weight: bold; display: none; z-index: 2000; box-shadow: 0 5px 20px rgba(0,0,0,0.6); }
     </style>
 </head>
 <body>
 
-    <!-- ANKA KUŞU HAVALI GİRİŞ EKRANI -->
+    <!-- 4K ANKA KUŞU AÇILIŞ ANİMASYONU -->
     <div id="splashScreen">
-        <div class="phoenix-logo">🦅</div>
+        <div class="phoenix-img-container">
+            <img src="https://i.ibb.co/3ykB94m/anka.jpg" alt="Anka Kuşu">
+        </div>
         <div class="splash-title">ANKA SERVİS</div>
-        <div class="splash-sub">Elite Digital & SMS Solutions</div>
+        <div class="splash-sub">Elite Digital Solutions • 4K Edition</div>
     </div>
 
     <div class="container">
         
-        <!-- GİRİŞ / KAYIT EKRANI -->
+        <!-- GİRİŞ / KAYIT EKRANI (SEKMELİ) -->
         <div id="authScreen" class="auth-wrapper" style="display:none;">
             <div class="auth-box">
-                <h2>🦅 ANKA VIP Giriş</h2>
-                <p style="margin-bottom:20px; color:#a8a29e;">Size özel bakiyenizi korumak için giriş yapın.</p>
+                <div style="display:flex; justify-content:center; margin-bottom:15px;">
+                    <div style="width:70px; height:70px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; box-shadow:0 0 15px rgba(212,175,55,0.5);">
+                        <img src="https://i.ibb.co/3ykB94m/anka.jpg" style="width:100%; height:100%; object-fit:cover;" alt="Logo">
+                    </div>
+                </div>
+                <h2>🦅 ANKA VIP Panel</h2>
                 
+                <div class="auth-tabs">
+                    <button class="auth-tab active" id="tabLoginBtn" onclick="switchAuthMode('login')">Giriş Yap</button>
+                    <button class="auth-tab" id="tabRegisterBtn" onclick="switchAuthMode('register')">Kayıt Ol</button>
+                </div>
+
                 <div id="authError" style="color:#f43f5e; margin-bottom:15px; font-size:0.9rem; display:none;"></div>
 
                 <label style="text-align:left; display:block; font-size:0.9rem; color:#d6d3d1;"><b>Kullanıcı Adı:</b></label>
-                <input type="text" id="authUsername" placeholder="Kullanıcı adınızı belirleyin">
+                <input type="text" id="authUsername" placeholder="Kullanıcı adınızı girin">
 
                 <label style="text-align:left; display:block; font-size:0.9rem; color:#d6d3d1;"><b>Şifre:</b></label>
                 <input type="password" id="authPassword" placeholder="Şifrenizi girin">
 
-                <button class="btn" onclick="handleAuth()" style="margin-top:10px;">Sisteme Giriş Yap</button>
+                <button class="btn" id="authSubmitBtn" onclick="handleAuth()" style="margin-top:10px;">Giriş Yap</button>
             </div>
         </div>
 
         <!-- ANA PANEL EKRANI -->
         <div id="panelScreen" style="display:none;">
             <header>
+                <div style="display:inline-block; width:60px; height:60px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin-bottom:10px; box-shadow:0 0 15px rgba(212,175,55,0.4);">
+                    <img src="https://i.ibb.co/3ykB94m/anka.jpg" style="width:100%; height:100%; object-fit:cover;" alt="Logo">
+                </div>
                 <h1>🦅 ANKA SERVİS - Elite Panel</h1>
                 <p>Güvenli Sosyal Medya & Otomatik Numara Çözümleri</p>
                 <div class="iban-box" onclick="copyIban()" title="Kopyalamak için tıklayın">
@@ -393,7 +433,7 @@ app.get('/', (req, res) => {
                 <button type="button" class="btn" id="payButton" onclick="submitOrder()">Bakiyeden Satın Al</button>
             </div>
             <div id="resultSection" style="display:none;"></div>
-            <button type="button" onclick="closeModal()" style="background:#1f1b18; color:#d6d3d1; border:1px solid var(--border-gold); padding:12px; width:100%; border-radius:10px; margin-top:15px; cursor:pointer; font-weight:bold;">Kapat</button>
+            <button type="button" onclick="closeModal()" style="background:#1c1917; color:#d6d3d1; border:1px solid var(--border-gold); padding:12px; width:100%; border-radius:10px; margin-top:15px; cursor:pointer; font-weight:bold;">Kapat</button>
         </div>
     </div>
 
@@ -416,30 +456,50 @@ app.get('/', (req, res) => {
             <input type="text" id="depositContact" placeholder="@telegramadi">
 
             <button type="button" class="btn" id="depositSubmitBtn" onclick="submitDeposit()">Bakiye Bildirimi Gönder</button>
-            <button type="button" onclick="closeDepositModal()" style="background:#1f1b18; color:#d6d3d1; border:1px solid var(--border-gold); padding:12px; width:100%; border-radius:10px; margin-top:12px; cursor:pointer; font-weight:bold;">İptal</button>
+            <button type="button" onclick="closeDepositModal()" style="background:#1c1917; color:#d6d3d1; border:1px solid var(--border-gold); padding:12px; width:100%; border-radius:10px; margin-top:12px; cursor:pointer; font-weight:bold;">İptal</button>
         </div>
     </div>
 
     <div id="copyAlert" class="copy-alert">📋 IBAN Panoya Kopyalandı!</div>
 
     <script>
-        // Giriş animasyonunu 1.8 saniye sonra yumuşakça kapat
+        // 2 saniye sonra 4K Anka Kuşu açılış ekranını kaldır
         setTimeout(() => {
             const splash = document.getElementById('splashScreen');
             splash.style.opacity = '0';
             splash.style.visibility = 'hidden';
             checkUserSession();
-        }, 1800);
+        }, 2000);
 
         let allProducts = [];
         let selectedProductData = null;
         let currentUser = localStorage.getItem('anka_current_user');
+        let currentAuthMode = 'login'; // 'login' veya 'register'
 
         function checkUserSession() {
             if (!currentUser) {
                 document.getElementById('authScreen').style.display = 'flex';
             } else {
                 initPanel();
+            }
+        }
+
+        function switchAuthMode(mode) {
+            currentAuthMode = mode;
+            const tabLogin = document.getElementById('tabLoginBtn');
+            const tabReg = document.getElementById('tabRegisterBtn');
+            const submitBtn = document.getElementById('authSubmitBtn');
+            const errBox = document.getElementById('authError');
+            errBox.style.display = 'none';
+
+            if (mode === 'login') {
+                tabLogin.classList.add('active');
+                tabReg.classList.remove('active');
+                submitBtn.innerText = 'Giriş Yap';
+            } else {
+                tabReg.classList.add('active');
+                tabLogin.classList.remove('active');
+                submitBtn.innerText = 'Kayıt Ol';
             }
         }
 
@@ -455,14 +515,30 @@ app.get('/', (req, res) => {
             }
 
             let savedPass = localStorage.getItem('anka_pwd_' + u);
-            if (savedPass && savedPass !== p) {
-                errBox.innerText = 'Şifre hatalı! Lütfen doğru şifreyi girin.';
+
+            if (currentAuthMode === 'register') {
+                if (savedPass) {
+                    errBox.innerText = 'Bu kullanıcı adı zaten alınmış! Lütfen giriş yapın.';
+                    errBox.style.display = 'block';
+                    return;
+                }
+                localStorage.setItem('anka_pwd_' + u, p);
+                alert('✅ Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+                switchAuthMode('login');
+                return;
+            }
+
+            // Login modu
+            if (!savedPass) {
+                errBox.innerText = 'Böyle bir hesap bulunamadı! Önce Kayıt Olun.';
                 errBox.style.display = 'block';
                 return;
             }
 
-            if (!savedPass) {
-                localStorage.setItem('anka_pwd_' + u, p);
+            if (savedPass !== p) {
+                errBox.innerText = 'Şifre hatalı!';
+                errBox.style.display = 'block';
+                return;
             }
 
             localStorage.setItem('anka_current_user', u);
@@ -643,5 +719,5 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 ANKA SERVİS VIP Panel ${PORT} portunda başarıyla aktif!`);
+    console.log(`🚀 ANKA SERVİS 4K VIP Panel ${PORT} portunda başarıyla aktif!`);
 });
