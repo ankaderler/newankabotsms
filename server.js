@@ -33,7 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ürün Kataloğu
+// Ürün Kataloğu (SMS Onay ürünleri service ve country parametreleri ile işaretlendi)
 const products = [
   // Instagram Hizmetleri
   { id: 1, category: "Instagram", name: "1. Düşmeyen Takipçi (500 Adet)", price: 450, desc: "Yüksek kaliteli, düşüşe karşı korumalı özel Instagram takipçi." },
@@ -79,7 +79,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Şık Mavi VIP Web Paneli
+// Yepyeni, Kusursuz Mavi VIP Web Paneli Arayüzü
 app.get('/index.html', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -90,37 +90,38 @@ app.get('/index.html', (req, res) => {
         <title>🦅 Anka VIP Medya & SMS Paneli</title>
         <style>
             :root { 
-                --bg: #070b14; 
-                --card: #0f172a; 
-                --accent: #3b82f6; 
-                --accent-hover: #2563eb; 
-                --blue-glow: #60a5fa; 
-                --text: #f8fafc; 
-                --border: #1e293b; 
+                --bg: #030712; 
+                --card: #0b1329; 
+                --accent: #2563eb; 
+                --accent-hover: #1d4ed8; 
+                --blue-glow: #38bdf8; 
+                --text: #f0f9ff; 
+                --border: #1e3a8a; 
             }
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
             .container { max-width: 1050px; margin: 0 auto; }
-            header { text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #0b1329, #0f172a); border-radius: 18px; border: 1px solid var(--border); margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); position: relative; overflow: hidden; }
-            header::before { content: "🦅"; font-size: 5rem; position: absolute; right: 25px; top: 15px; opacity: 0.06; }
+            header { text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #0f172a, #1e3a8a); border-radius: 18px; border: 1px solid var(--border); margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); position: relative; overflow: hidden; }
+            header::before { content: "🦅"; font-size: 5rem; position: absolute; right: 25px; top: 15px; opacity: 0.08; }
             h1 { color: var(--blue-glow); margin: 0 0 10px 0; font-size: 2.4rem; letter-spacing: 1px; }
             p { color: #94a3b8; margin: 0; }
-            .iban-box { background: #131c31; padding: 20px 25px; border-radius: 14px; display: inline-block; margin-top: 22px; border-left: 5px solid var(--accent); text-align: left; border: 1px solid #1e293b; box-shadow: 0 4px 15px rgba(0,0,0,0.4); max-width: 550px; width: 100%; box-sizing: border-box; }
+            .iban-box { background: #0f172a; padding: 20px 25px; border-radius: 14px; display: inline-block; margin-top: 22px; border-left: 5px solid var(--blue-glow); text-align: left; border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 550px; width: 100%; box-sizing: border-box; }
             .iban-box b { color: var(--blue-glow); }
-            .category-title { color: var(--blue-glow); border-bottom: 2px solid #1e293b; padding-bottom: 8px; margin-top: 45px; font-size: 1.6rem; display: flex; align-items: center; gap: 10px; font-weight: 600; }
+            .category-title { color: var(--blue-glow); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-top: 45px; font-size: 1.6rem; display: flex; align-items: center; gap: 10px; font-weight: 600; }
             .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 20px; margin-top: 20px; }
-            .card { background: var(--card); border-radius: 14px; padding: 22px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, border-color 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-            .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+            .card { background: var(--card); border-radius: 14px; padding: 22px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, border-color 0.2s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+            .card:hover { transform: translateY(-3px); border-color: var(--blue-glow); }
             .card h3 { margin-top: 0; color: #ffffff; font-size: 1.2rem; }
             .price { font-size: 1.6rem; color: var(--blue-glow); font-weight: bold; margin: 15px 0; }
-            .btn { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #ffffff; border: none; padding: 12px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; display: block; width: 100%; box-sizing: border-box; transition: opacity 0.2s; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+            .btn { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #ffffff; border: none; padding: 12px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; display: block; width: 100%; box-sizing: border-box; transition: opacity 0.2s; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4); }
             .btn:hover { opacity: 0.9; }
-            .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
-            .modal-content { background: var(--card); padding: 30px; border-radius: 16px; width: 90%; max-width: 450px; border: 1px solid var(--accent); box-shadow: 0 15px 35px rgba(0,0,0,0.6); }
-            input, textarea { width: 100%; padding: 12px; margin: 8px 0 15px 0; background: #070b14; border: 1px solid #334155; color: white; border-radius: 8px; box-sizing: border-box; }
-            input:focus, textarea:focus { border-color: var(--blue-glow); outline: none; }
+            .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(3,7,18,0.88); justify-content: center; align-items: center; z-index: 1000; }
+            .modal-content { background: var(--card); padding: 30px; border-radius: 16px; width: 90%; max-width: 480px; border: 1px solid var(--blue-glow); box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
+            input { width: 100%; padding: 12px; margin: 8px 0 15px 0; background: #030712; border: 1px solid #1e3a8a; color: white; border-radius: 8px; box-sizing: border-box; }
+            input:focus { border-color: var(--blue-glow); outline: none; }
             .support-link { color: var(--blue-glow); text-decoration: none; font-weight: bold; }
             .support-link:hover { text-decoration: underline; }
-            .payment-info-box { background: #070b14; padding: 12px; border-radius: 8px; border: 1px dashed var(--accent); margin-bottom: 15px; font-size: 0.9rem; color: #cbd5e1; }
+            .payment-info-box { background: #030712; padding: 15px; border-radius: 10px; border: 1px dashed var(--blue-glow); margin-bottom: 15px; font-size: 0.95rem; color: #cbd5e1; line-height: 1.6; }
+            .result-box { background: #030712; padding: 15px; border-radius: 10px; border: 1px solid #10b981; color: #34d399; margin-top: 15px; text-align: center; font-size: 1.1rem; word-break: break-all; }
         </style>
     </head>
     <body>
@@ -129,10 +130,10 @@ app.get('/index.html', (req, res) => {
                 <h1>🦅 Anka VIP Medya & SMS Paneli</h1>
                 <p>Güvenli Otomatik Teslimat ve Sosyal Medya Hizmetleri</p>
                 <div class="iban-box">
-                    <strong>💳 Ödeme Yapılacak Kişisel IBAN Bilgileri:</strong><br>
-                    • Alıcı Adı Soyadı: <b>${ACCOUNT_HOLDER}</b><br>
-                    • IBAN: <b>${ADMIN_IBAN}</b><br>
-                    • Açıklama / Destek: <a href="https://t.me/SMSPATRONUM" target="_blank" class="support-link">${SUPPORT_USERNAME}</a>
+                    <strong>💳 Ödeme Yapılacak Kişisel IBAN Adresi:</strong><br>
+                    • Alıcı Adı Soyadı: <b>Resul Sakal</b><br>
+                    • IBAN: <b>TR62 0006 2000 5000 0006 8107 73</b><br>
+                    • Açıklama / Destek: <a href="https://t.me/SMSPATRONUM" target="_blank" class="support-link">@SMSPATRONUM</a>
                 </div>
             </header>
             <div id="product-list"></div>
@@ -140,27 +141,24 @@ app.get('/index.html', (req, res) => {
 
         <div id="orderModal" class="modal">
             <div class="modal-content">
-                <h3 id="modalTitle" style="color: var(--blue-glow); margin-top:0;">Sipariş ve Ödeme</h3>
-                <div class="payment-info-box">
-                    • Ödenecek Tutar: <b id="modalPrice" style="color:var(--blue-glow);"></b> TL<br>
-                    • Alıcı: <b>${ACCOUNT_HOLDER}</b><br>
-                    • IBAN: <b style="color:var(--blue-glow);">${ADMIN_IBAN}</b>
+                <h3 id="modalTitle" style="color: var(--blue-glow); margin-top:0;">Ödeme ve Sipariş Ekranı</h3>
+                <div class="payment-info-box" id="modalDetailsText">
+                    <!-- Dinamik Ödeme Detayları -->
                 </div>
-                <form id="purchaseForm">
-                    <input type="hidden" id="pName">
-                    <input type="hidden" id="pPrice">
+                <div id="formSection">
                     <label><b>Telegram Kullanıcı Adınız (@kullaniciadi):</b></label>
-                    <input type="text" id="customerContact" required placeholder="@kullaniciadi">
-                    <label><b>Dekont / Ödeme Bildirim Notu:</b></label>
-                    <textarea id="paymentNote" placeholder="Resul Sakal adına havale yapıldı..." required rows="2"></textarea>
-                    <button type="submit" class="btn" style="width:100%; margin-top:5px;">Ödeme Bildirimi Gönder</button>
-                    <button type="button" onclick="closeModal()" style="background:#1e293b; color:#cbd5e1; border:none; padding:10px; width:100%; border-radius:8px; margin-top:10px; cursor:pointer;">İptal</button>
-                </form>
+                    <input type="text" id="customerContact" placeholder="@kullaniciadi" required>
+                    <button type="button" class="btn" id="payButton" onclick="submitPayment()">Ödemeyi Yaptım</button>
+                </div>
+                <div id="resultSection" style="display:none;"></div>
+                <button type="button" onclick="closeModal()" style="background:#1e3a8a; color:#cbd5e1; border:none; padding:10px; width:100%; border-radius:8px; margin-top:15px; cursor:pointer;">Kapat / Ana Menü</button>
             </div>
         </div>
 
         <script>
             let allProducts = [];
+            let selectedProductData = null;
+
             fetch('/api/products').then(res => res.json()).then(data => {
                 allProducts = data.products;
                 renderProducts();
@@ -174,6 +172,7 @@ app.get('/index.html', (req, res) => {
                     let catName = cat === 'SMSOnay' ? '📱 SMS Onay & Numara Servisleri' : '🦅 ' + cat + ' Hizmetleri';
                     html += \`<div class="category-title">\${catName}</div><div class="grid">\`;
                     allProducts.filter(p => p.category === cat).forEach(p => {
+                        let pJson = encodeURIComponent(JSON.stringify(p));
                         html += \`
                             <div class="card">
                                 <div>
@@ -182,7 +181,7 @@ app.get('/index.html', (req, res) => {
                                 </div>
                                 <div>
                                     <div class="price">\${p.price} TL</div>
-                                    <button class="btn" onclick="openModal('\${p.name}', \${p.price})">Satın Al</button>
+                                    <button class="btn" onclick="openModal('\${pJson}')">Satın Al</button>
                                 </div>
                             </div>
                         \`;
@@ -192,34 +191,80 @@ app.get('/index.html', (req, res) => {
                 container.innerHTML = html;
             }
 
-            function openModal(name, price) {
-                document.getElementById('modalTitle').innerText = name;
-                document.getElementById('modalPrice').innerText = price;
-                document.getElementById('pName').value = name;
-                document.getElementById('pPrice').value = price;
+            function openModal(productStr) {
+                selectedProductData = JSON.parse(decodeURIComponent(productStr));
+                document.getElementById('modalTitle0').innerText = selectedProductData.name;
+                
+                let detailsHTML = \`
+                    • Ürün / Hizmet: <b style="color:var(--blue-glow);">\${selectedProductData.name}</b><br>
+                    • Ödenecek Tutar: <b style="color:var(--blue-glow);">\${selectedProductData.price} TL</b><br>
+                    • Alıcı Adı Soyadı: <b>Resul Sakal</b><br>
+                    • IBAN: <b style="color:var(--blue-glow);">TR62 0006 2000 5000 0006 8107 73</b><br><br>
+                    <span style="font-size:0.85rem; color:#94a3b8;">⚠️ Lütfen yukarıdaki tutarı IBAN'a gönderdikten sonra aşağıya kullanıcı adınızı yazıp <b>"Ödemeyi Yaptım"</b> butonuna basınız.</span>
+                \`;
+                document.getElementById('modalDetailsText').innerHTML = detailsHTML;
+                document.getElementById('customerContact').value = '';
+                document.getElementById('formSection').style.display = 'block';
+                document.getElementById('resultSection').style.display = 'none';
                 document.getElementById('orderModal').style.display = 'flex';
             }
 
-            function closeModal() { document.getElementById('orderModal').style.display = 'none'; }
+            function closeModal() { 
+                document.getElementById('orderModal').style.display = 'none'; 
+                location.reload();
+            }
 
-            document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
+            async function submitPayment() {
+                const customerContact = document.getElementById('customerContact').value.trim();
+                if(!customerContact) {
+                    alert('Lütfen Telegram kullanıcı adınızı giriniz!');
+                    return;
+                }
+
+                const payBtn = document.getElementById('payButton');
+                payBtn.innerText = "İşleniyor, Lütfen Bekleyin...";
+                payBtn.disabled = true;
+
                 const res = await fetch('/api/order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        productName: document.getElementById('pName').value,
-                        price: document.getElementById('pPrice').value,
-                        customerContact: document.getElementById('customerContact').value,
-                        paymentNote: document.getElementById('paymentNote').value
+                        product: selectedProductData,
+                        customerContact: customerContact
                     })
                 });
                 const data = await res.json();
+                
+                document.getElementById('formSection').style.display = 'none';
+                const resultSec = document.getElementById('resultSection');
+                resultSec.style.display = 'block';
+
                 if(data.success) {
-                    alert('Ödeme bildiriminiz başarıyla iletildi! Lütfen @SMSPATRONUM adresine dekontunuzu atarak iletişime geçin.');
-                    location.reload();
+                    if(data.phoneNumber) {
+                        resultSec.innerHTML = \`
+                            <div class="result-box">
+                                ✅ Ödeme Bildirimi Alındı ve Numaranız Çekildi!<br><br>
+                                📞 <b>Numara: +\${data.phoneNumber}</b><br>
+                                <span style="font-size:0.85rem; color:#cbd5e1;">Lütfen bu numarayı ilgili uygulamada kullanın.</span>
+                            </div>
+                        \`;
+                    } else {
+                        resultSec.innerHTML = \`
+                            <div class="result-box" style="border-color:#38bdf8; color:#38bdf8;">
+                                ✅ Ödeme Bildiriminiz Başarıyla Gönderildi!<br><br>
+                                Admin (@SMSPATRONUM) ödemenizi kontrol edip hizmetinizi en kısa sürede teslim edecektir.
+                            </div>
+                        \`;
+                    }
+                } else {
+                    resultSec.innerHTML = \`
+                        <div class="result-box" style="border-color:#ef4444; color:#ef4444;">
+                            ⚠️ Bildirim iletildi ancak SMS API stok hatası alındı: \${data.message || 'Stok bulunamadı'}<br>
+                            Lütfen @SMSPATRONUM ile iletişime geçin.
+                        </div>
+                    \`;
                 }
-            });
+            }
         </script>
     </body>
     </html>
@@ -227,25 +272,38 @@ app.get('/index.html', (req, res) => {
 });
 
 app.get('/api/products', (req, res) => {
-  res.json({ success: true, products, iban: ADMIN_IBAN, holder: ACCOUNT_HOLDER, support: SUPPORT_USERNAME });
+  res.json({ success: true, products });
 });
 
+// Sipariş / Ödeme Bildirimi ve Otomatik Numara Alma API'si
 app.post('/api/order', async (req, res) => {
-  const { productName, price, customerContact, paymentNote } = req.body;
+  const { product, customerContact } = req.body;
   try {
+    let phoneNumber = null;
+
+    // Eğer ürün bir SMS Onay servisi ise, butona basıldığı an API'den numarayı çek
+    if (product.category === 'SMSOnay' && product.service && product.country) {
+      const apiResult = await getNumberFromAPI(product.service, product.country);
+      if (apiResult.success) {
+        phoneNumber = apiResult.phoneNumber;
+      }
+    }
+
+    // Admine Telegram üzerinden detaylı bildirim gönder
     const message = `🚨 *YENİ WEB ÖDEME BİLDİRİMİ!* 🚨\n\n` +
-                    `📦 *Ürün:* ${productName}\n` +
-                    `💰 *Tutar:* ${price} TL\n` +
+                    `📦 *Ürün:* ${product.name}\n` +
+                    `💰 *Tutar:* ${product.price} TL\n` +
                     `👤 *Müşteri Telegram:* ${customerContact}\n` +
-                    `📝 *Not:* ${paymentNote}\n\n` +
-                    `💳 Alıcı: ${ACCOUNT_HOLDER} -${ADMIN_IBAN}`;
+                    (phoneNumber ? `📞 *Verilen Numara:* +${phoneNumber}\n` : '') +
+                    `\n💳 Alıcı: ${ACCOUNT_HOLDER} -${ADMIN_IBAN}`;
 
     if (ADMIN_ID && ADMIN_ID !== "BURAYA_SENIN_TELEGRAM_USER_ID_YAZ") {
       await bot.telegram.sendMessage(ADMIN_ID, message, { parse_mode: 'Markdown' });
     }
-    res.json({ success: true });
+
+    res.json({ success: true, phoneNumber });
   } catch (err) {
-    res.json({ success: true });
+    res.json({ success: false, message: "İşlem sırasında hata oluştu." });
   }
 });
 
