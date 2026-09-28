@@ -96,6 +96,7 @@
         input:focus { outline: none; border-color: var(--gold-light); }
         .payment-info-box { background: #0c0a09; padding: 18px; border-radius: 12px; border: 1px dashed var(--gold-primary); margin-bottom: 20px; font-size: 0.95rem; color: #e7e5e4; }
         .result-box { background: #0c0a09; padding: 18px; border-radius: 12px; border: 1px solid var(--gold-light); color: var(--gold-light); margin-top: 15px; text-align: center; font-weight: 500; word-break: break-all; }
+        .support-link { color: var(--gold-light); text-decoration: underline; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -118,7 +119,6 @@
             <h3 id="modalTitle" style="color: var(--gold-light); margin-top:0;">Ödeme ve Sipariş Ekranı</h3>
             <div class="payment-info-box" id="modalDetailsText"></div>
             <div id="formSection">
-                <!-- Dinamik Alan: Sadece Sosyal Medya ürünlerinde görünür -->
                 <div id="targetFieldContainer">
                     <label style="font-size:0.9rem; color:#d6d3d1;"><b>Hedef Link / Kullanıcı Adı:</b></label>
                     <input type="text" id="customerTarget" placeholder="@kullaniciadi veya profil linki">
@@ -180,11 +180,10 @@
                 ⚠️ Ödemeyi gerçekleştirdikten sonra bilgilerinizi girip bildirim gönderin.
             `;
 
-            // Eğer ürün SMS Onay ise hedef link alanını gizle, sosyal medyayse göster
             const targetContainer = document.getElementById('targetFieldContainer');
             if (selectedProductData.category === 'SMSOnay') {
                 targetContainer.style.display = 'none';
-                document.getElementById('customerTarget').value = 'SMS_ONAY_URUNU'; // Gizli değer
+                document.getElementById('customerTarget').value = 'SMS_ONAY_URUNU';
             } else {
                 targetContainer.style.display = 'block';
                 document.getElementById('customerTarget').value = '';
@@ -235,15 +234,15 @@
                     resultSec.innerHTML = `
                         <div class="result-box">
                             ✅ Ödeme bildiriminiz yöneticimize iletildi!<br>
-                            Admin (@SMSPATRONUM) ödemenizi onayladığı an hizmetiniz paneline / hesabınıza aktarılacaktır.
+                            Admin ödemenizi onayladığı an hizmetiniz paneline / hesabınıza aktarılacaktır.
                         </div>
                     `;
                 }
             } else {
                 resultSec.innerHTML = `
                     <div class="result-box" style="border-color:#ef4444; color:#ef4444;">
-                        ⚠️ Bildirim iletildi ancak hata alındı: ${data.message || 'Stok bulunamadı'}<br>
-                        Lütfen @SMSPATRONUM ile iletişime geçin.
+                        ⚠️ Bildirim iletildi ancak numara temin edilemedi: ${data.message || 'Stok bulunamadı'}<br><br>
+                        Sorun yaşamamak ve anında destek almak için hemen <a href="https://t.me/SMSPATRONUM" target="_blank" class="support-link">@SMSPATRONUM</a> ile iletişime geçin.
                     </div>
                 `;
             }
