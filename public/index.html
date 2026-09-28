@@ -25,37 +25,61 @@
         .container { max-width: 1050px; margin: 0 auto; }
         header { 
             text-align: center; 
-            padding: 45px 20px; 
+            padding: 35px 20px; 
             background: linear-gradient(135deg, #1c1917, #292524); 
             border-radius: 20px; 
             border: 1px solid var(--border-gold); 
-            margin-bottom: 35px; 
+            margin-bottom: 25px; 
             box-shadow: 0 15px 40px rgba(212, 175, 55, 0.15); 
             position: relative;
-            overflow: hidden;
         }
-        h1 { color: var(--gold-light); margin: 0 0 10px 0; font-size: 2.6rem; text-shadow: 0 2px 10px rgba(212,175,55,0.3); }
-        p { color: #d6d3d1; margin: 0; font-size: 1.1rem; }
+        h1 { color: var(--gold-light); margin: 0 0 10px 0; font-size: 2.4rem; text-shadow: 0 2px 10px rgba(212,175,55,0.3); }
+        p { color: #d6d3d1; margin: 0; font-size: 1.05rem; }
+        
+        /* Cüzdan / Bakiye Alanı */
+        .wallet-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(12, 10, 9, 0.9);
+            padding: 15px 25px;
+            border-radius: 12px;
+            border: 1px solid var(--gold-primary);
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+        }
+        .wallet-info { font-size: 1.1rem; color: #e7e5e4; }
+        .wallet-info b { color: var(--gold-light); font-size: 1.3rem; }
+        .wallet-btn {
+            background: linear-gradient(135deg, #d4af37, #b8860b);
+            color: #0c0a09;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .wallet-btn:hover { opacity: 0.9; }
+
         .iban-box { 
             background: rgba(12, 10, 9, 0.85); 
-            padding: 22px 30px; 
+            padding: 18px 25px; 
             border-radius: 14px; 
             display: inline-block; 
-            margin-top: 25px; 
+            margin-top: 20px; 
             border-left: 5px solid var(--gold-primary); 
             text-align: left; 
             border: 1px solid var(--border-gold); 
-            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
         }
         .iban-box b { color: var(--gold-light); }
         .category-title { 
             color: var(--gold-light); 
             border-bottom: 2px solid var(--border-gold); 
             padding-bottom: 10px; 
-            margin-top: 50px; 
-            font-size: 1.7rem; 
+            margin-top: 40px; 
+            font-size: 1.6rem; 
             font-weight: 600; 
-            text-shadow: 0 2px 8px rgba(212,175,55,0.2);
         }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 22px; margin-top: 20px; }
         .card { 
@@ -68,17 +92,14 @@
             justify-content: space-between; 
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(212, 175, 55, 0.2);
-        }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(212, 175, 55, 0.2); }
         .card h3 { margin-top: 0; color: #ffffff; font-size: 1.3rem; }
-        .price { font-size: 1.8rem; color: var(--gold-light); font-weight: bold; margin: 15px 0; text-shadow: 0 2px 5px rgba(212,175,55,0.3); }
+        .price { font-size: 1.7rem; color: var(--gold-light); font-weight: bold; margin: 15px 0; }
         .btn { 
             background: linear-gradient(135deg, #d4af37, #b8860b); 
             color: #0c0a09; 
             border: none; 
-            padding: 13px 18px; 
+            padding: 12px 18px; 
             border-radius: 10px; 
             font-weight: bold; 
             cursor: pointer; 
@@ -86,7 +107,6 @@
             display: block; 
             width: 100%; 
             font-size: 1rem;
-            transition: opacity 0.2s;
             box-shadow: 0 4px 15px rgba(212,175,55,0.3);
         }
         .btn:hover { opacity: 0.9; }
@@ -105,18 +125,27 @@
             <h1>🦅 ANKA VIP - Premium Medya & SMS Paneli</h1>
             <p>Kesintisiz ve Güvenli Sosyal Medya & Numara Çözümleri</p>
             <div class="iban-box">
-                <strong>💳 Ödeme Yapılacak Güvenli IBAN Adresi:</strong><br>
-                • Alıcı Adı Soyadı: <b>Resul Sakal</b><br>
-                • IBAN: <b>TR62 0006 2000 5000 0006 8107 73</b><br>
-                • Destek Hattı: <a href="https://t.me/SMSPATRONUM" target="_blank" style="color:var(--gold-light);">@SMSPATRONUM</a>
+                <strong>💳 Para Yatırılacak IBAN Adresi:</strong><br>
+                • Alıcı: <b>Resul Sakal</b> | IBAN: <b>TR62 0006 2000 5000 0006 8107 73</b><br>
+                • Destek: <a href="https://t.me/SMSPATRONUM" target="_blank" style="color:var(--gold-light);">@SMSPATRONUM</a>
             </div>
         </header>
+
+        <!-- Bakiye Cüzdan Çubuğu -->
+        <div class="wallet-bar">
+            <div class="wallet-info">
+                Hesap Bakiyeniz: <b id="userBalance">0.00 TL</b>
+            </div>
+            <button class="wallet-btn" onclick="openDepositModal()">➕ Bakiye Yükle</button>
+        </div>
+
         <div id="product-list"></div>
     </div>
 
+    <!-- Sipariş / Satın Al Modal -->
     <div id="orderModal" class="modal">
         <div class="modal-content">
-            <h3 id="modalTitle" style="color: var(--gold-light); margin-top:0;">Ödeme ve Sipariş Ekranı</h3>
+            <h3 id="modalTitle" style="color: var(--gold-light); margin-top:0;">Sipariş Ekranı</h3>
             <div class="payment-info-box" id="modalDetailsText"></div>
             <div id="formSection">
                 <div id="targetFieldContainer">
@@ -127,16 +156,38 @@
                 <label style="font-size:0.9rem; color:#d6d3d1;"><b>Telegram Kullanıcı Adınız (@kullaniciadi):</b></label>
                 <input type="text" id="customerContact" placeholder="@telegramadi" required>
                 
-                <button type="button" class="btn" id="payButton" onclick="submitPayment()">Ödemeyi Yaptım Bildir</button>
+                <button type="button" class="btn" id="payButton" onclick="submitOrder()">Bakiyeden Satın Al</button>
             </div>
             <div id="resultSection" style="display:none;"></div>
             <button type="button" onclick="closeModal()" style="background:#292524; color:#d6d3d1; border:1px solid var(--border-gold); padding:12px; width:100%; border-radius:10px; margin-top:15px; cursor:pointer; font-weight:bold;">Kapat / Ana Menü</button>
         </div>
     </div>
 
+    <!-- Bakiye Yükleme Modal -->
+    <div id="depositModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: var(--gold-light); margin-top:0;">💳 Hesaba Bakiye Yükle</h3>
+            <div class="payment-info-box">
+                • IBAN: <b>TR62 0006 2000 5000 0006 8107 73 (Resul Sakal)</b><br>
+                • Açıklama kısmına Telegram kullanıcı adınızı yazarak havale/EFT yapın.
+            </div>
+            <label style="font-size:0.9rem; color:#d6d3d1;"><b>Yatırılan Tutar (TL):</b></label>
+            <input type="number" id="depositAmount" placeholder="Örn: 200">
+            
+            <label style="font-size:0.9rem; color:#d6d3d1;"><b>Telegram Kullanıcı Adınız (@kullaniciadi):</b></label>
+            <input type="text" id="depositContact" placeholder="@telegramadi">
+
+            <button type="button" class="btn" onclick="submitDeposit()">Bakiye Bildirimi Gönder</button>
+            <button type="button" onclick="closeDepositModal()" style="background:#292524; color:#d6d3d1; border:1px solid var(--border-gold); padding:12px; width:100%; border-radius:10px; margin-top:12px; cursor:pointer; font-weight:bold;">İptal</button>
+        </div>
+    </div>
+
     <script>
         let allProducts = [];
         let selectedProductData = null;
+        let userBalance = parseFloat(localStorage.getItem('anka_balance') || '0');
+
+        document.getElementById('userBalance').innerText = userBalance.toFixed(2) + ' TL';
 
         fetch('/api/products').then(res => res.json()).then(data => {
             allProducts = data.products;
@@ -175,9 +226,8 @@
             document.getElementById('modalTitle').innerText = selectedProductData.name;
             document.getElementById('modalDetailsText').innerHTML = `
                 • Ürün: <b style="color:var(--gold-light);">${selectedProductData.name}</b><br>
-                • Tutar: <b style="color:var(--gold-light);">${selectedProductData.price} TL</b><br>
-                • IBAN: <b>TR62 0006 2000 5000 0006 8107 73 (Resul Sakal)</b><br><br>
-                ⚠️ Ödemeyi gerçekleştirdikten sonra bilgilerinizi girip bildirim gönderin.
+                • Fiyat: <b style="color:var(--gold-light);">${selectedProductData.price} TL</b><br>
+                • Mevcut Bakiyeniz: <b style="color:var(--gold-light);">${userBalance.toFixed(2)} TL</b>
             `;
 
             const targetContainer = document.getElementById('targetFieldContainer');
@@ -195,19 +245,36 @@
             document.getElementById('orderModal').style.display = 'flex';
         }
 
-        function closeModal() { document.getElementById('orderModal').style.display = 'none'; location.reload(); }
+        function closeModal() { document.getElementById('orderModal').style.display = 'none'; }
+        
+        function openDepositModal() { document.getElementById('depositModal').style.display = 'flex'; }
+        function closeDepositModal() { document.getElementById('depositModal').style.display = 'none'; }
 
-        async function submitPayment() {
+        async function submitDeposit() {
+            const amount = document.getElementById('depositAmount').value;
+            const contact = document.getElementById('depositContact').value.trim();
+            if(!amount || !contact) { alert('Lütfen tüm alanları doldurun!'); return; }
+
+            alert('Bakiye talebiniz yöneticimize iletildi. Onaylandığında bakiyeniz yüklenecektir.');
+            closeDepositModal();
+        }
+
+        async function submitOrder() {
             const target = document.getElementById('customerTarget').value.trim();
             const contact = document.getElementById('customerContact').value.trim();
             
             if(!contact || (selectedProductData.category !== 'SMSOnay' && !target)) { 
-                alert('Lütfen gerekli alanları eksiksiz doldurun!'); 
+                alert('Lütfen gerekli alanları doldurun!'); 
                 return; 
             }
 
+            if(userBalance < selectedProductData.price) {
+                alert('Bakiyeniz yetersiz! Lütfen önce "Bakiye Yükle" butonunu kullanın.');
+                return;
+            }
+
             const payBtn = document.getElementById('payButton');
-            payBtn.innerText = "İşleniyor, Lütfen Bekleyin...";
+            payBtn.innerText = "İşleniyor...";
             payBtn.disabled = true;
 
             const res = await fetch('/api/order', {
@@ -222,29 +289,17 @@
             resultSec.style.display = 'block';
 
             if(data.success) {
+                userBalance -= selectedProductData.price;
+                localStorage.setItem('anka_balance', userBalance);
+                document.getElementById('userBalance').innerText = userBalance.toFixed(2) + ' TL';
+
                 if(data.phoneNumber) {
-                    resultSec.innerHTML = `
-                        <div class="result-box">
-                            ✅ Ödeme Bildirimi Alındı ve Numara Tanımlandı!<br><br>
-                            📞 <b>Verilen Numara: +${data.phoneNumber}</b><br>
-                            <span style="font-size:0.85rem; color:#d6d3d1;">Bu numarayı ilgili uygulamada kullanabilirsiniz.</span>
-                        </div>
-                    `;
+                    resultSec.innerHTML = `<div class="result-box">✅ İşlem Başarılı!<br><br>📞 <b>Numaranız: +${data.phoneNumber}</b></div>`;
                 } else {
-                    resultSec.innerHTML = `
-                        <div class="result-box">
-                            ✅ Ödeme bildiriminiz yöneticimize iletildi!<br>
-                            Admin ödemenizi onayladığı an hizmetiniz paneline / hesabınıza aktarılacaktır.
-                        </div>
-                    `;
+                    resultSec.innerHTML = `<div class="result-box">✅ Siparişiniz alındı ve işleme konuldu!</div>`;
                 }
             } else {
-                resultSec.innerHTML = `
-                    <div class="result-box" style="border-color:#ef4444; color:#ef4444;">
-                        ⚠️ Bildirim iletildi ancak numara temin edilemedi: ${data.message || 'Stok bulunamadı'}<br><br>
-                        Sorun yaşamamak ve anında destek almak için hemen <a href="https://t.me/SMSPATRONUM" target="_blank" class="support-link">@SMSPATRONUM</a> ile iletişime geçin.
-                    </div>
-                `;
+                resultSec.innerHTML = `<div class="result-box" style="border-color:#ef4444; color:#ef4444;">⚠️ Hata: ${data.message || 'Stok bulunamadı'}<br><br>Destek: <a href="https://t.me/SMSPATRONUM" target="_blank" class="support-link">@SMSPATRONUM</a></div>`;
             }
         }
     </script>
