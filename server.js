@@ -42,12 +42,11 @@ const products = [
   { id: 16, category: "SMSOnay", name: "🇬🇧 WhatsApp İngiltere Numara", price: 250, desc: "onaylasms.com.tr üzerinden İngiltere WhatsApp numarası.", service: "wa", country: "uk" }
 ];
 
-// SMS-Activate / OnaylaSMS API Yardımcı Fonksiyonları
+// API Fonksiyonları
 async function getNumberFromAPI(service, country) {
   try {
     const url = `${SMS_API_URL}?api_key=${SMS_API_KEY}&action=getNumber&service=${service}&country=${country}`;
     const response = await axios.get(url);
-    // Örnek dönüş: ACCESS_NUMBER:id:number veya NO_NUMBERS / BAD_KEY
     const resText = response.data;
     if (resText.startsWith('ACCESS_NUMBER')) {
       const parts = resText.split(':');
@@ -55,27 +54,8 @@ async function getNumberFromAPI(service, country) {
     }
     return { success: false, message: resText };
   } catch (err) {
-    console.error("API Numara Çekme Hatası:", err.message);
     return { success: false, message: "API Bağlantı Hatası" };
   }
-}
-
-async function checkSMSStatus(activationId) {
-  try {
-    const url = `${SMS_API_URL}?api_key=${SMS_API_KEY}&action=getStatus&id=${activationId}`;
-    const response = await axios.get(url);
-    // Örnek dönüş: STATUS_WAIT_CODE, STATUS_OK:code, STATUS_CANCEL
-    return response.data;
-  } catch (err) {
-    return "ERROR";
-  }
-}
-
-async function cancelNumber(activationId) {
-  try {
-    const url = `${SMS_API_URL}?api_key=${SMS_API_KEY}&action=setStatus&status=8&id=${activationId}`;
-    await axios.get(url);
-  } catch (err) {}
 }
 
 app.get('/', (req, res) => {
@@ -151,7 +131,6 @@ app.get('/index.html', (req, res) => {
             function renderProducts() {
                 const container = document.getElementById('product-list');
                 const categories = [...new Set(allProducts.map(p => p.category))];
-                
                 let html = '';
                 categories.forEach(cat => {
                     let catName = cat === 'SMSOnay' ? '📱 SMS Onay & Numara Servisleri' : cat + ' Hizmetleri';
@@ -254,7 +233,6 @@ bot.start((ctx) => {
   );
 });
 
-// Instagram Menü
 bot.action('menu_Instagram', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
@@ -272,7 +250,6 @@ bot.action('menu_Instagram', async (ctx) => {
   );
 });
 
-// TikTok Menü
 bot.action('menu_TikTok', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
@@ -290,7 +267,6 @@ bot.action('menu_TikTok', async (ctx) => {
   );
 });
 
-// Telegram Menü
 bot.action('menu_Telegram', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
@@ -305,12 +281,11 @@ bot.action('menu_Telegram', async (ctx) => {
   );
 });
 
-// SMS Onay Menüsü
 bot.action('menu_SMSOnay', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
     `📱 *SMS Onay & Numara Servisleri*:\n` +
-    `Sistem *onaylasms.com.tr* API altyapısıyla çalışır. Ödeme sonrası anlık numara çekilir.\n` +
+    `Sistem *onaylasms.com.tr* API altyapısıyla çalışır.\n` +
     `💳 IBAN: \`${ADMIN_IBAN}\` (${ACCOUNT_HOLDER})\n\n` +
     `Ülke ve Platform Seçiniz:`,
     {
@@ -327,7 +302,6 @@ bot.action('menu_SMSOnay', async (ctx) => {
   );
 });
 
-// Normal Ürün Satın Alma Yönlendirmesi
 ['buy_1', 'buy_2', 'buy_3', 'buy_4_options', 'buy_6', 'buy_7', 'buy_8_options', 'buy_10', 'buy_11'].forEach(action => {
   bot.action(action, async (ctx) => {
     await ctx.answerCbQuery();
@@ -348,7 +322,6 @@ bot.action('menu_SMSOnay', async (ctx) => {
   });
 });
 
-// SMS Onay Butonları Tıklandığında onaylaSMS.com.tr API'den Numara Çekme Akışı
 const smsRoutes = [
   { action: 'sms_usa_tg', service: 'tg', country: 'usa', name: 'Telegram ABD', price: 200 },
   { action: 'sms_turkey_tg', service: 'tg', country: 'turkey', name: 'Telegram TR', price: 250 },
@@ -360,25 +333,23 @@ const smsRoutes = [
 smsRoutes.forEach(item => {
   bot.action(item.action, async (ctx) => {
     await ctx.answerCbQuery();
-    
-    // API'den numara çekiliyor
     const apiResult = await getNumberFromAPI(item.service, item.country);
     
     if (!apiResult.success) {
       return ctx.reply(
-        `❌ Şuan bu ülkede stok bulunamadı veya API yanıtı: ${apiResult.message}\nLütfen birazdan tekrar deneyin veya adminle iletişime geçin.`,
+        `❌ Şuan bu ülkede stok bulunamadı veya API yanıtı: ${apiResult.message}\nLütfen birazdan tekrar deneyin.`,
         Markup.inlineKeyboard([[Markup.button.callback('🔙 Ana Menü', 'main_menu')]])
       );
     }
 
-    const { activationId, phoneNumber } = apiResult;
+    const { phoneNumber } = apiResult;
 
     ctx.reply(
       `📱 *${item.name} Numaranız Başarıyla Çekildi!*\n\n` +
       `📞 Numara: \`+${phoneNumber}\`\n` +
       `💰 Tutar: *${item.price} TL*\n` +
       `💳 Alıcı: *${ACCOUNT_HOLDER}* (\`${ADMIN_IBAN}\`)\n\n` +
-      `⚠️ Lütfen ödemeyi yukarıdaki IBAN'a yapıp dekontu @SMSPATRONUM adresine iletin. Ödemeniz onaylandığında SMS kodunuz otomatik olarak buraya gelecektir!`,
+      `⚠️ Lütfen ödemeyi yukarıdaki IBAN'a yapıp dekontu @SMSPATRONUM adresine iletin.`,
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
@@ -406,11 +377,9 @@ bot.action('main_menu', async (ctx) => {
 });
 
 bot.launch().then(() => {
-  console.log("Telegram Bot onaylasms.com.tr API ve tam menü ile aktif!");
-}).catch(err => {
-  console.log("Bot başlatılırken hata oluştu:", err.message);
+  console.log("Telegram Bot aktif!");
 });
 
 app.listen(PORT, () => {
-  console.log(`Anka VIP Panel ${PORT} portunda başarıyla çalışıyor...`);
+  console.log(`Panel ${PORT} portunda çalışıyor...`);
 });
