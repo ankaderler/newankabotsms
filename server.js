@@ -12,11 +12,14 @@ const ADMIN_CHAT_ID = '8964930489';
 const ONAYLASMS_API_KEY = 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
 const ONAYLASMS_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
 
+// 📦 Tam Ürün Listesi ve Fiyatlar
 const products = [
     { id: 1, category: 'Telegram', name: 'Telegram Abone Paketi (750 Adet)', desc: 'Gerçek ve aktif Türk aboneler.', price: 150 },
-    { id: 2, category: 'TikTok', name: 'TikTok Takipçi (250 Adet)', desc: 'Kaliteli ve düşmeyen takipçi.', price: 250 },
-    { id: 3, category: 'SMSOnay', name: 'Telegram Onaylı Numara (1 Adet)', desc: 'Anında SMS onay kodlu numara (OnaylaSMS Altyapısı).', price: 45, serviceCode: 'tg' },
-    { id: 4, category: 'SMSOnay', name: 'WhatsApp Onaylı Numara (1 Adet)', desc: 'WhatsApp için anında teslimat (OnaylaSMS Altyapısı).', price: 55, serviceCode: 'wa' }
+    { id: 2, category: 'Telegram', name: 'Telegram Görüntülenme / İzlenme', desc: 'Son gönderileriniz için yüksek izlenme.', price: 75 },
+    { id: 3, category: 'TikTok', name: 'TikTok Takipçi (250 Adet)', desc: 'Kaliteli ve düşmeyen takipçi.', price: 250 },
+    { id: 4, category: 'TikTok', name: 'TikTok Beğeni Paketi (500 Adet)', desc: 'Keşfet etkili organik beğeni.', price: 120 },
+    { id: 5, category: 'SMSOnay', name: 'Telegram Onaylı Numara (1 Adet)', desc: 'Anında SMS onay kodlu numara (OnaylaSMS Altyapısı).', price: 45, serviceCode: 'tg' },
+    { id: 6, category: 'SMSOnay', name: 'WhatsApp Onaylı Numara (1 Adet)', desc: 'WhatsApp için anında teslimat (OnaylaSMS Altyapısı).', price: 55, serviceCode: 'wa' }
 ];
 
 app.get('/api/products', (req, res) => {
@@ -93,6 +96,7 @@ async function sendTelegramMessage(text, replyMarkup = null) {
     });
 }
 
+// 🦅 4K Ultra HD Blue Phoenix Temalı Arayüz
 const HTML_PAGE = `<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -110,7 +114,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: #030303;
+            background: var(--bg-color);
             color: var(--text-main); 
             margin: 0; 
             padding: 20px; 
@@ -132,16 +136,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         .splash-bg-phoenix {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: url('/phoenix.jpg') no-repeat center center;
-            background-size: cover;
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-            filter: brightness(0.85) contrast(1.2) saturate(1.1);
-        }
-        .splash-bg-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, rgba(3,7,18,0.2) 0%, rgba(3,3,3,0.85) 90%);
+            background: radial-gradient(circle at center, #0f172a 0%, #030303 100%);
         }
         .splash-content {
             position: relative;
@@ -155,9 +150,11 @@ const HTML_PAGE = `<!DOCTYPE html>
             border: 4px solid var(--gold-light);
             box-shadow: 0 0 90px rgba(56, 189, 248, 0.9), inset 0 0 40px rgba(186, 230, 253, 0.8);
             margin: 0 auto 25px auto;
-            background: url('/phoenix.jpg') no-repeat center center;
-            background-size: cover;
-            image-rendering: -webkit-optimize-contrast;
+            background: linear-gradient(135deg, #38bdf8, #1e3a8a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 80px;
         }
         .splash-title {
             color: var(--gold-light);
@@ -262,9 +259,8 @@ const HTML_PAGE = `<!DOCTYPE html>
 <body>
     <div id="splashScreen">
         <div class="splash-bg-phoenix"></div>
-        <div class="splash-bg-overlay"></div>
         <div class="splash-content">
-            <div class="phoenix-mega-avatar"></div>
+            <div class="phoenix-mega-avatar">🦅</div>
             <div class="splash-title">ANKA SERVİS</div>
             <div class="splash-sub">4K Ultra HD Blue Phoenix Edition • Hazırlanıyor...</div>
         </div>
@@ -273,7 +269,7 @@ const HTML_PAGE = `<!DOCTYPE html>
     <div class="container">
         <div id="authScreen" class="auth-wrapper" style="display:none;">
             <div class="auth-box">
-                <div style="width:75px; height:75px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin:0 auto 15px auto; box-shadow:0 0 25px rgba(56,189,248,0.6); background: url('/phoenix.jpg') no-repeat center center; background-size: cover; image-rendering: -webkit-optimize-contrast;"></div>
+                <div style="width:75px; height:75px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin:0 auto 15px auto; box-shadow:0 0 25px rgba(56,189,248,0.6); background:linear-gradient(135deg, #38bdf8, #1e3a8a); display:flex; align-items:center; justify-content:center; font-size:32px;">🦅</div>
                 <h2>🦅 ANKA VIP Panel</h2>
                 <div class="auth-tabs">
                     <button class="auth-tab active" id="tabLoginBtn" onclick="switchAuthMode('login')">Giriş Yap</button>
@@ -290,7 +286,7 @@ const HTML_PAGE = `<!DOCTYPE html>
 
         <div id="panelScreen" style="display:none;">
             <header>
-                <div style="display:inline-block; width:70px; height:70px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin-bottom:10px; box-shadow:0 0 25px rgba(56,189,248,0.5); background: url('/phoenix.jpg') no-repeat center center; background-size: cover; image-rendering: -webkit-optimize-contrast;"></div>
+                <div style="display:inline-block; width:70px; height:70px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin-bottom:10px; box-shadow:0 0 25px rgba(56,189,248,0.5); background:linear-gradient(135deg, #38bdf8, #1e3a8a); display:inline-flex; align-items:center; justify-content:center; font-size:30px;">🦅</div>
                 <h1>🦅 ANKA SERVİS - Elite Panel</h1>
                 <p>Güvenli Sosyal Medya & Otomatik Numara Çözümleri</p>
                 <div class="iban-box" onclick="copyIban()" title="Kopyalamak için tıklayın">
