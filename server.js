@@ -24,18 +24,25 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Ürün Kataloğu
 const products = [
+  // Instagram Hizmetleri
   { id: 1, category: "Instagram", name: "1. Düşmeyen Takipçi (500 Adet)", price: 450, desc: "Yüksek kaliteli, düşüşe karşı korumalı özel Instagram takipçi." },
   { id: 2, category: "Instagram", name: "2. Türk Beğeni (500 Adet)", price: 200, desc: "Gerçek görünümlü Türk kullanıcılardan beğeni paketi." },
   { id: 3, category: "Instagram", name: "3. Gönderi İzlenme (10000 Adet)", price: 250, desc: "Keşfet etkili yüksek hacimli video/reels izlenmesi." },
   { id: 4, category: "Instagram", name: "4a. Ucuz Takipçi (100 Adet)", price: 120, desc: "Ekonomik başlangıç paketi." },
   { id: 5, category: "Instagram", name: "4b. Ucuz Takipçi (250 Adet)", price: 270, desc: "Ekonomik orta paket." },
+
+  // TikTok Hizmetleri
   { id: 6, category: "TikTok", name: "1. TikTok Takipçi (250 Adet)", price: 250, desc: "Aktif TikTok profil desteği." },
   { id: 7, category: "TikTok", name: "2. TikTok Beğeni (2500 Adet)", price: 300, desc: "Yüksek adetli TikTok video beğeni paketi." },
   { id: 8, category: "TikTok", name: "3a. TikTok İzlenme (100 Bin Adet)", price: 10000, desc: "Devasa kitleye ulaşmak için 100K izlenme." },
   { id: 9, category: "TikTok", name: "3b. TikTok İzlenme (25 Bin Adet)", price: 320, desc: "Popülerleşme odaklı 25K izlenme paketi." },
-  { id: 10, category: "TikTok", name: "4. TikTok PK Puan Savaşı", price: 100, desc: "Canlı yayınlar için 250 PK Puan desteği." },
+  { id: 10, category: "TikTok", name: "4. TikTok PK Puan Savaşı (250 Adet)", price: 100, desc: "Canlı yayınlar için 250 PK Puan desteği." },
+
+  // Telegram Hizmetleri
   { id: 11, category: "Telegram", name: "Telegram Abone Paketi (750 Adet)", price: 350, desc: "Kanal veya grup için kaliteli 750 üye." },
-  { id: 12, category: "SMSOnay", name: "🇺🇸 Telegram ABD Numara", price: 200, desc: "onaylasms.com.tr üzerinden ABD Telegram numarası.", service: "tg", country: "usa" },
+
+  // SMS Onay / Numara Servisleri
+  { id: 12, category: "SMSOnay", name: "🇺🇸 Telegram ABD Numara", price: 200, desc: "Anlık API üzerinden çekilen ABD Telegram numarası.", service: "tg", country: "usa" },
   { id: 13, category: "SMSOnay", name: "🇹🇷 Telegram TR Numara", price: 250, desc: "onaylasms.com.tr üzerinden Türkiye Telegram numarası.", service: "tg", country: "turkey" },
   { id: 14, category: "SMSOnay", name: "🇹🇷 WhatsApp TR Numara", price: 320, desc: "onaylasms.com.tr üzerinden Türkiye WhatsApp numarası.", service: "wa", country: "turkey" },
   { id: 15, category: "SMSOnay", name: "🇵🇭 WhatsApp Filipinler Numara", price: 250, desc: "onaylasms.com.tr üzerinden Filipinler WhatsApp numarası.", service: "wa", country: "philippines" },
@@ -62,7 +69,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Web Paneli
+// Gelişmiş Gold & Anka Temalı Web Paneli
 app.get('/index.html', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -70,35 +77,50 @@ app.get('/index.html', (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>👑 Anka VIP Medya & Bot Paneli</title>
+        <title>🔥 Anka VIP Medya & SMS Paneli</title>
         <style>
-            :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #f8fafc; --gold: #f59e0b; }
+            :root { 
+                --bg: #090d16; 
+                --card: #131c2e; 
+                --accent: #d97706; 
+                --gold: #fbbf24; 
+                --text: #f3f4f6; 
+                --border: #1e293b; 
+            }
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-            .container { max-width: 1000px; margin: 0 auto; }
-            header { text-align: center; padding: 30px 0; background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 15px; border: 1px solid #334155; margin-bottom: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-            h1 { color: var(--gold); margin: 0 0 10px 0; font-size: 2.2rem; }
-            .iban-box { background: #334155; padding: 15px; border-radius: 10px; display: inline-block; margin-top: 15px; border-left: 4px solid var(--gold); text-align: left; }
-            .category-title { color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 5px; margin-top: 40px; font-size: 1.5rem; }
-            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
-            .card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid #334155; display: flex; flex-direction: column; justify-content: space-between; }
-            .price { font-size: 1.4rem; color: var(--gold); font-weight: bold; margin: 15px 0; }
-            .btn { background: var(--accent); color: #0f172a; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; display: block; margin-top: 10px; }
-            .btn:hover { background: #0ea5e9; color: white; }
-            .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; }
-            .modal-content { background: var(--card); padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; border: 1px solid var(--gold); }
-            input, textarea { width: 100%; padding: 10px; margin: 10px 0; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 5px; box-sizing: border-box; }
+            .container { max-width: 1050px; margin: 0 auto; }
+            header { text-align: center; padding: 35px 20px; background: linear-gradient(135deg, #111827, #0f172a); border-radius: 16px; border: 1px solid var(--border); margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
+            header::before { content: "🦅"; font-size: 5rem; position: absolute; right: 20px; top: 10px; opacity: 0.08; }
+            h1 { color: var(--gold); margin: 0 0 10px 0; font-size: 2.3rem; letter-spacing: 1px; }
+            p { color: #94a3b8; margin: 0; }
+            .iban-box { background: #1a2333; padding: 18px 25px; border-radius: 12px; display: inline-block; margin-top: 20px; border-left: 4px solid var(--gold); text-align: left; border: 1px solid #26354a; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+            .iban-box b { color: var(--gold); }
+            .category-title { color: var(--gold); border-bottom: 2px solid #26354a; padding-bottom: 8px; margin-top: 45px; font-size: 1.6rem; display: flex; align-items: center; gap: 10px; }
+            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 20px; margin-top: 20px; }
+            .card { background: var(--card); border-radius: 14px; padding: 22px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, border-color 0.2s ease; }
+            .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+            .card h3 { margin-top: 0; color: #ffffff; font-size: 1.2rem; }
+            .price { font-size: 1.5rem; color: var(--gold); font-weight: bold; margin: 15px 0; }
+            .btn { background: linear-gradient(135deg, #f59e0b, #d97706); color: #090d16; border: none; padding: 12px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; display: block; width: 100%; box-sizing: border-box; transition: opacity 0.2s; }
+            .btn:hover { opacity: 0.9; }
+            .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
+            .modal-content { background: var(--card); padding: 30px; border-radius: 16px; width: 90%; max-width: 450px; border: 1px solid var(--accent); box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+            input, textarea { width: 100%; padding: 12px; margin: 10px 0; background: #090d16; border: 1px solid #334155; color: white; border-radius: 8px; box-sizing: border-box; }
+            input:focus, textarea:focus { border-color: var(--gold); outline: none; }
+            .support-link { color: var(--gold); text-decoration: none; font-weight: bold; }
+            .support-link:hover { text-decoration: underline; }
         </style>
     </head>
     <body>
         <div class="container">
             <header>
-                <h1>👑 Anka VIP Medya & Bot Paneli</h1>
-                <p>onaylasms.com.tr Altyapılı Otomatik Numara ve Sosyal Medya Hizmetleri</p>
+                <h1>🦅 Anka VIP Medya & SMS Paneli</h1>
+                <p>Güvenli Otomatik Teslimat ve Sosyal Medya Hizmetleri</p>
                 <div class="iban-box">
                     <strong>💳 Ödeme Yapılacak IBAN Bilgileri:</strong><br>
                     • Alıcı Adı Soyadı: <b>${ACCOUNT_HOLDER}</b><br>
                     • IBAN: <b>${ADMIN_IBAN}</b><br>
-                    • Destek / Sorun Bildirimi: <a href="https://t.me/SMSPATRONUM" target="_blank" style="color: var(--accent);">${SUPPORT_USERNAME}</a>
+                    • Destek / Bildirim: <a href="https://t.me/SMSPATRONUM" target="_blank" class="support-link">${SUPPORT_USERNAME}</a>
                 </div>
             </header>
             <div id="product-list"></div>
@@ -107,7 +129,7 @@ app.get('/index.html', (req, res) => {
         <div id="orderModal" class="modal">
             <div class="modal-content">
                 <h3 id="modalTitle" style="color: var(--gold); margin-top:0;">Sipariş Ver</h3>
-                <p>Tutar: <b id="modalPrice" style="color:var(--accent);"></b> TL</p>
+                <p>Tutar: <b id="modalPrice" style="color:var(--gold);"></b> TL</p>
                 <form id="purchaseForm">
                     <input type="hidden" id="pName">
                     <input type="hidden" id="pPrice">
@@ -115,8 +137,8 @@ app.get('/index.html', (req, res) => {
                     <input type="text" id="customerContact" required placeholder="@kullaniciadi">
                     <label>Dekont / Ödeme Açıklama Notu:</label>
                     <textarea id="paymentNote" placeholder="Resul Sakal adına havale yapıldı..." required></textarea>
-                    <button type="submit" class="btn" style="width:100%;">Ödeme Bildirimi Gönder</button>
-                    <button type="button" onclick="closeModal()" style="background:#475569; color:white; border:none; padding:8px; width:100%; border-radius:5px; margin-top:10px; cursor:pointer;">İptal</button>
+                    <button type="submit" class="btn" style="width:100%; margin-top:10px;">Ödeme Bildirimi Gönder</button>
+                    <button type="button" onclick="closeModal()" style="background:#334155; color:white; border:none; padding:10px; width:100%; border-radius:8px; margin-top:10px; cursor:pointer;">İptal</button>
                 </form>
             </div>
         </div>
@@ -133,7 +155,7 @@ app.get('/index.html', (req, res) => {
                 const categories = [...new Set(allProducts.map(p => p.category))];
                 let html = '';
                 categories.forEach(cat => {
-                    let catName = cat === 'SMSOnay' ? '📱 SMS Onay & Numara Servisleri' : cat + ' Hizmetleri';
+                    let catName = cat === 'SMSOnay' ? '📱 SMS Onay & Numara Servisleri' : '🦅 ' + cat + ' Hizmetleri';
                     html += \`<div class="category-title">\${catName}</div><div class="grid">\`;
                     allProducts.filter(p => p.category === cat).forEach(p => {
                         html += \`
@@ -211,10 +233,10 @@ app.post('/api/order', async (req, res) => {
   }
 });
 
-// TELEGRAM BOT
+// TELEGRAM BOT KOMUTLARI VE MENÜLERİ
 bot.start((ctx) => {
   ctx.reply(
-    `👑 *Anka VIP Medya & Bot Paneline Hoş Geldiniz!*\n\n` +
+    `🦅 *Anka VIP Medya & Bot Paneline Hoş Geldiniz!*\n\n` +
     `💳 *Ödeme Bilgilerimiz:*\n` +
     `• Alıcı Adı Soyadı: *${ACCOUNT_HOLDER}*\n` +
     `• IBAN: \`${ADMIN_IBAN}\`\n\n` +
@@ -233,10 +255,14 @@ bot.start((ctx) => {
   );
 });
 
+// 1. Instagram Alt Menü ve Butonları
 bot.action('menu_Instagram', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
-    `📸 *Instagram Hizmetleri*:\n💳 IBAN: \`${ADMIN_IBAN}\` (${ACCOUNT_HOLDER})\n\nPaket seçin:`,
+    `📸 *Instagram Hizmetleri Katogorisi*:\n\n` +
+    `💳 Alıcı: *${ACCOUNT_HOLDER}*\n` +
+    `💳 IBAN: \`${ADMIN_IBAN}\`\n\n` +
+    `Lütfen almak istediğiniz paketi seçin:`,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
@@ -250,10 +276,14 @@ bot.action('menu_Instagram', async (ctx) => {
   );
 });
 
+// 2. TikTok Alt Menü ve Butonları
 bot.action('menu_TikTok', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
-    `🎵 *TikTok Hizmetleri*:\n💳 IBAN: \`${ADMIN_IBAN}\` (${ACCOUNT_HOLDER})\n\nPaket seçin:`,
+    `🎵 *TikTok Hizmetleri Kategorisi*:\n\n` +
+    `💳 Alıcı: *${ACCOUNT_HOLDER}*\n` +
+    `💳 IBAN: \`${ADMIN_IBAN}\`\n\n` +
+    `Lütfen almak istediğiniz paketi seçin:`,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
@@ -267,10 +297,14 @@ bot.action('menu_TikTok', async (ctx) => {
   );
 });
 
+// 3. Telegram Hizmetleri Alt Menü
 bot.action('menu_Telegram', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
-    `📢 *Telegram Hizmetleri*:\n💳 IBAN: \`${ADMIN_IBAN}\` (${ACCOUNT_HOLDER})\n\nSeçenekler:`,
+    `📢 *Telegram Hizmetleri Kategorisi*:\n\n` +
+    `💳 Alıcı: *${ACCOUNT_HOLDER}*\n` +
+    `💳 IBAN: \`${ADMIN_IBAN}\`\n\n` +
+    `Seçenekler:`,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
@@ -281,12 +315,13 @@ bot.action('menu_Telegram', async (ctx) => {
   );
 });
 
+// 4. SMS Onay / Numara Servisleri Alt Menü
 bot.action('menu_SMSOnay', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
-    `📱 *SMS Onay & Numara Servisleri*:\n` +
-    `Sistem *onaylasms.com.tr* API altyapısıyla çalışır.\n` +
-    `💳 IBAN: \`${ADMIN_IBAN}\` (${ACCOUNT_HOLDER})\n\n` +
+    `📱 *SMS Onay & Numara Servisleri*:\n\n` +
+    `Sistem API üzerinden otomatik numara çeker.\n` +
+    `💳 Alıcı: *${ACCOUNT_HOLDER}* | IBAN: \`${ADMIN_IBAN}\`\n\n` +
     `Ülke ve Platform Seçiniz:`,
     {
       parse_mode: 'Markdown',
@@ -302,13 +337,14 @@ bot.action('menu_SMSOnay', async (ctx) => {
   );
 });
 
+// Standart Ürün Satın Alma Yönlendirmeleri
 ['buy_1', 'buy_2', 'buy_3', 'buy_4_options', 'buy_6', 'buy_7', 'buy_8_options', 'buy_10', 'buy_11'].forEach(action => {
   bot.action(action, async (ctx) => {
     await ctx.answerCbQuery();
     ctx.reply(
       `🛒 *Sipariş Bilgisi*\n\n` +
       `💳 Ödemeyi yapacağınız IBAN:\n` +
-      `• Alıcı: *${ACCOUNT_HOLDER}*\n` +
+      `• Alıcı Adı Soyadı: *${ACCOUNT_HOLDER}*\n` +
       `• IBAN: \`${ADMIN_IBAN}\`\n\n` +
       `⚠️ Ödemeyi yaptıktan sonra dekontunuzla birlikte lütfen **@SMSPATRONUM** adresine yazınız.`,
       {
@@ -322,6 +358,7 @@ bot.action('menu_SMSOnay', async (ctx) => {
   });
 });
 
+// SMS Onay Butonları (API ile Numara Çekme)
 const smsRoutes = [
   { action: 'sms_usa_tg', service: 'tg', country: 'usa', name: 'Telegram ABD', price: 200 },
   { action: 'sms_turkey_tg', service: 'tg', country: 'turkey', name: 'Telegram TR', price: 250 },
@@ -348,7 +385,8 @@ smsRoutes.forEach(item => {
       `📱 *${item.name} Numaranız Başarıyla Çekildi!*\n\n` +
       `📞 Numara: \`+${phoneNumber}\`\n` +
       `💰 Tutar: *${item.price} TL*\n` +
-      `💳 Alıcı: *${ACCOUNT_HOLDER}* (\`${ADMIN_IBAN}\`)\n\n` +
+      `💳 Alıcı Adı Soyadı: *${ACCOUNT_HOLDER}*\n` +
+      `💳 IBAN: \`${ADMIN_IBAN}\`\n\n` +
       `⚠️ Lütfen ödemeyi yukarıdaki IBAN'a yapıp dekontu @SMSPATRONUM adresine iletin.`,
       {
         parse_mode: 'Markdown',
@@ -365,7 +403,7 @@ smsRoutes.forEach(item => {
 bot.action('main_menu', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.reply(
-    `👑 *Anka VIP Ana Menü:*`,
+    `🦅 *Anka VIP Ana Menü:*`,
     Markup.inlineKeyboard([
       [Markup.button.callback('📸 Instagram Hizmetleri', 'menu_Instagram')],
       [Markup.button.callback('🎵 TikTok Hizmetleri', 'menu_TikTok')],
@@ -377,9 +415,9 @@ bot.action('main_menu', async (ctx) => {
 });
 
 bot.launch().then(() => {
-  console.log("Telegram Bot aktif!");
+  console.log("Telegram Bot ve Gold Anka Paneli aktif!");
 });
 
 app.listen(PORT, () => {
-  console.log(`Panel ${PORT} portunda çalışıyor...`);
+  console.log(`Panel ${PORT} portunda başarıyla çalışıyor...`);
 });
