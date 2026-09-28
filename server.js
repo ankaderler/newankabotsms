@@ -7,7 +7,9 @@ const PORT = process.env.PORT || 3000;
 
 const BOT_TOKEN = process.env.BOT_TOKEN || "8874989367:AAF9imqTVxSbBAgrfalatspzb7gBogTG1bE";
 const ADMIN_ID = process.env.ADMIN_ID || "BURAYA_SENIN_TELEGRAM_USER_ID_YAZ";
-const ADMIN_IBAN = process.env.ADMIN_IBAN || "TR00 0000 0000 0000 0000 0000 00";
+const ADMIN_IBAN = "TR62 0006 2000 5000 0006 8107 73";
+const ACCOUNT_HOLDER = "Resul Sakal";
+const SUPPORT_USERNAME = "@SMSPATRONUM";
 
 const bot = new Telegraf(BOT_TOKEN);
 
@@ -33,7 +35,13 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/products', (req, res) => {
-  res.json({ success: true, products, iban: ADMIN_IBAN });
+  res.json({ 
+    success: true, 
+    products, 
+    iban: ADMIN_IBAN, 
+    holder: ACCOUNT_HOLDER,
+    support: SUPPORT_USERNAME 
+  });
 });
 
 app.post('/api/order', async (req, res) => {
@@ -44,7 +52,7 @@ app.post('/api/order', async (req, res) => {
                     `📦 **Ürün:** ${productName}\n` +
                     `💰 **Tutar:** ${price} TL\n` +
                     `👤 **Müşteri İletişim:** ${customerContact || 'Belirtilmedi'}\n\n` +
-                    `⚠️ Müşteri ödemeyi yaptığını bildirdi, lütfen IBAN kontrolü sağlayın ve ardından dekont onaylayıp bot üzerinden müşteriye bilgi verin!`;
+                    `⚠️ Müşteri ödemeyi yaptığını bildirdi, lütfen IBAN kontrolü sağlayın!`;
 
     if (ADMIN_ID && ADMIN_ID !== "BURAYA_SENIN_TELEGRAM_USER_ID_YAZ") {
       await bot.telegram.sendMessage(ADMIN_ID, message, { parse_mode: 'Markdown' });
@@ -55,6 +63,10 @@ app.post('/api/order', async (req, res) => {
     console.error(err);
     res.json({ success: true, message: "Siparişiniz alındı." });
   }
+});
+
+bot.start((ctx) => {
+  ctx.reply(`👑 Anka VIP Medya & Bot Paneline Hoş Geldiniz!\n\nSipariş vermek ve destek almak için:\nDestek: ${SUPPORT_USERNAME}\nWeb Sitemizi ziyaret edebilirsiniz.`);
 });
 
 bot.launch().then(() => {
