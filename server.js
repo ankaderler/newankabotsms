@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { Telegraf, Markup } = require('telegraf');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,38 +12,77 @@ const ADMIN_IBAN = "TR62 0006 2000 5000 0006 8107 73";
 const ACCOUNT_HOLDER = "Resul Sakal";
 const SUPPORT_USERNAME = "@SMSPATRONUM";
 
+// OnaylaSMS API Bilgileri
+const SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php";
+const SMS_API_KEY = "osms_7778905748d37f5a5998d9581c7e74e3f0214285925c9ae4";
+
 const bot = new Telegraf(BOT_TOKEN);
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Zenginleştirilmiş ve Kategorize Edilmiş VIP Ürün Kataloğu
+// Ürün Kataloğu
 const products = [
-  // Instagram Kategorisi
-  { id: 1, category: "Instagram", name: "Instagram Türk Gerçek Görünümlü Takipçi (1000 Adet)", price: 150, desc: "Profilinizi öne çıkaracak kaliteli Türk takipçi gönderimi.", autoStock: "Havuzda hazır stok mevcut (Otomatik teslim edilebilir)." },
-  { id: 2, category: "Instagram", name: "Instagram Gönderi Beğeni Paketi (1000 Adet)", price: 120, desc: "Paylaşımlarınızın etkileşimini artıran hızlı beğeni.", autoStock: "Hızlı gönderim sırasına eklenir." },
-  { id: 3, category: "Instagram", name: "Instagram Hikaye İzlenme Paketi (5000 Adet)", price: 130, desc: "Hikayeleriniz için yüksek hacimli görüntülenme.", autoStock: "Otomatik başlar." },
-  
-  // TikTok Kategorisi
-  { id: 4, category: "TikTok", name: "TikTok Türk Takipçi (1000 Adet)", price: 180, desc: "Aktif ve etkileşimli TikTok takipçi servisi.", autoStock: "Hazır gönderim listesi." },
-  { id: 5, category: "TikTok", name: "TikTok Video İzlenme + Beğeni Kombin (2000 Adet)", price: 140, desc: "Keşfet odaklı özel TikTok etkileşim paketi.", autoStock: "Anında işleme alınır." },
-
-  // Telegram Kategorisi
-  { id: 6, category: "Telegram", name: "Telegram Kanal / Grup Abonesi (1000 Adet)", price: 160, desc: "Kanalınızın güven vermesini sağlayacak kaliteli üye.", autoStock: "Bot havuzundan anlık gönderim." },
-  { id: 7, category: "Telegram", name: "🤖 Kendi Telegram Botunu Oluşturma Hizmeti", price: 500, desc: "Sıfırdan size özel butonlu, yönetim panelli bot kurulumu.", autoStock: "Admin birebir kurulum yapar (@SMSPATRONUM)." },
-
-  // Hesaplar & Numara Satış Kategorisi
-  { id: 8, category: "Hesaplar", name: "Instagram Rastgele (Random) Hesap (10 Adet)", price: 120, desc: "Onaylı/onaysız karışık yüksek kaliteli random Instagram hesapları.", autoStock: "Kullanıcı Adı:Şifre listesi anında verilir." },
-  { id: 9, category: "Hesaplar", name: "Gmail Random / Eskitilmiş Hesap (5 Adet)", price: 150, desc: "Onaylı, iş veya kişisel kullanım için hazır mail adresleri.", autoStock: "Mail:Şifre listesi otomatik teslim edilir." },
-  { id: 10, category: "Hesaplar", name: "Onaylı Dijital Platform / Numara Servisleri (10 Adet)", price: 200, desc: "Çeşitli platformlar için kullanılabilir onaylı dijital hesaplar.", autoStock: "Stoktan anında teslim veya admin desteği." }
+  { id: 1, category: "Instagram", name: "1. Düşmeyen Takipçi (500 Adet)", price: 450, desc: "Yüksek kaliteli, düşüşe karşı korumalı özel Instagram takipçi." },
+  { id: 2, category: "Instagram", name: "2. Türk Beğeni (500 Adet)", price: 200, desc: "Gerçek görünümlü Türk kullanıcılardan beğeni paketi." },
+  { id: 3, category: "Instagram", name: "3. Gönderi İzlenme (10000 Adet)", price: 250, desc: "Keşfet etkili yüksek hacimli video/reels izlenmesi." },
+  { id: 4, category: "Instagram", name: "4a. Ucuz Takipçi (100 Adet)", price: 120, desc: "Ekonomik başlangıç paketi." },
+  { id: 5, category: "Instagram", name: "4b. Ucuz Takipçi (250 Adet)", price: 270, desc: "Ekonomik orta paket." },
+  { id: 6, category: "TikTok", name: "1. TikTok Takipçi (250 Adet)", price: 250, desc: "Aktif TikTok profil desteği." },
+  { id: 7, category: "TikTok", name: "2. TikTok Beğeni (2500 Adet)", price: 300, desc: "Yüksek adetli TikTok video beğeni paketi." },
+  { id: 8, category: "TikTok", name: "3a. TikTok İzlenme (100 Bin Adet)", price: 10000, desc: "Devasa kitleye ulaşmak için 100K izlenme." },
+  { id: 9, category: "TikTok", name: "3b. TikTok İzlenme (25 Bin Adet)", price: 320, desc: "Popülerleşme odaklı 25K izlenme paketi." },
+  { id: 10, category: "TikTok", name: "4. TikTok PK Puan Savaşı", price: 100, desc: "Canlı yayınlar için 250 PK Puan desteği." },
+  { id: 11, category: "Telegram", name: "Telegram Abone Paketi (750 Adet)", price: 350, desc: "Kanal veya grup için kaliteli 750 üye." },
+  { id: 12, category: "SMSOnay", name: "🇺🇸 Telegram ABD Numara", price: 200, desc: "onaylasms.com.tr üzerinden ABD Telegram numarası.", service: "tg", country: "usa" },
+  { id: 13, category: "SMSOnay", name: "🇹🇷 Telegram TR Numara", price: 250, desc: "onaylasms.com.tr üzerinden Türkiye Telegram numarası.", service: "tg", country: "turkey" },
+  { id: 14, category: "SMSOnay", name: "🇹🇷 WhatsApp TR Numara", price: 320, desc: "onaylasms.com.tr üzerinden Türkiye WhatsApp numarası.", service: "wa", country: "turkey" },
+  { id: 15, category: "SMSOnay", name: "🇵🇭 WhatsApp Filipinler Numara", price: 250, desc: "onaylasms.com.tr üzerinden Filipinler WhatsApp numarası.", service: "wa", country: "philippines" },
+  { id: 16, category: "SMSOnay", name: "🇬🇧 WhatsApp İngiltere Numara", price: 250, desc: "onaylasms.com.tr üzerinden İngiltere WhatsApp numarası.", service: "wa", country: "uk" }
 ];
+
+// SMS-Activate / OnaylaSMS API Yardımcı Fonksiyonları
+async function getNumberFromAPI(service, country) {
+  try {
+    const url = `${SMS_API_URL}?api_key=${SMS_API_KEY}&action=getNumber&service=${service}&country=${country}`;
+    const response = await axios.get(url);
+    // Örnek dönüş: ACCESS_NUMBER:id:number veya NO_NUMBERS / BAD_KEY
+    const resText = response.data;
+    if (resText.startsWith('ACCESS_NUMBER')) {
+      const parts = resText.split(':');
+      return { success: true, activationId: parts[1], phoneNumber: parts[2] };
+    }
+    return { success: false, message: resText };
+  } catch (err) {
+    console.error("API Numara Çekme Hatası:", err.message);
+    return { success: false, message: "API Bağlantı Hatası" };
+  }
+}
+
+async function checkSMSStatus(activationId) {
+  try {
+    const url = `${SMS_API_URL}?api_key=${SMS_API_KEY}&action=getStatus&id=${activationId}`;
+    const response = await axios.get(url);
+    // Örnek dönüş: STATUS_WAIT_CODE, STATUS_OK:code, STATUS_CANCEL
+    return response.data;
+  } catch (err) {
+    return "ERROR";
+  }
+}
+
+async function cancelNumber(activationId) {
+  try {
+    const url = `${SMS_API_URL}?api_key=${SMS_API_KEY}&action=setStatus&status=8&id=${activationId}`;
+    await axios.get(url);
+  } catch (err) {}
+}
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Web sitesi için güncel ve zengin index.html (IBAN, Alıcı Adı ve Kategori Görünümlü)
+// Web Paneli
 app.get('/index.html', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -60,8 +100,7 @@ app.get('/index.html', (req, res) => {
             .iban-box { background: #334155; padding: 15px; border-radius: 10px; display: inline-block; margin-top: 15px; border-left: 4px solid var(--gold); text-align: left; }
             .category-title { color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 5px; margin-top: 40px; font-size: 1.5rem; }
             .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
-            .card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid #334155; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s; }
-            .card:hover { transform: translateY(-5px); border-color: var(--accent); }
+            .card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid #334155; display: flex; flex-direction: column; justify-content: space-between; }
             .price { font-size: 1.4rem; color: var(--gold); font-weight: bold; margin: 15px 0; }
             .btn { background: var(--accent); color: #0f172a; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; display: block; margin-top: 10px; }
             .btn:hover { background: #0ea5e9; color: white; }
@@ -74,37 +113,28 @@ app.get('/index.html', (req, res) => {
         <div class="container">
             <header>
                 <h1>👑 Anka VIP Medya & Bot Paneli</h1>
-                <p>En Güvenilir Sosyal Medya, Hesap ve Otomasyon Çözümleri</p>
+                <p>onaylasms.com.tr Altyapılı Otomatik Numara ve Sosyal Medya Hizmetleri</p>
                 <div class="iban-box">
                     <strong>💳 Ödeme Yapılacak IBAN Bilgileri:</strong><br>
-                    • Alıcı Adı: <b>${ACCOUNT_HOLDER}</b><br>
+                    • Alıcı Adı Soyadı: <b>${ACCOUNT_HOLDER}</b><br>
                     • IBAN: <b>${ADMIN_IBAN}</b><br>
-                    • Destek / Bildirim: <a href="https://t.me/SMSPATRONUM" target="_blank" style="color: var(--accent);">${SUPPORT_USERNAME}</a>
+                    • Destek / Sorun Bildirimi: <a href="https://t.me/SMSPATRONUM" target="_blank" style="color: var(--accent);">${SUPPORT_USERNAME}</a>
                 </div>
             </header>
-
             <div id="product-list"></div>
         </div>
 
         <div id="orderModal" class="modal">
             <div class="modal-content">
                 <h3 id="modalTitle" style="color: var(--gold); margin-top:0;">Sipariş Ver</h3>
-                <p>Seçilen Tutar: <b id="modalPrice" style="color:var(--accent);"></b> TL</p>
-                <p style="font-size: 0.9rem; color: #cbd5e1;">Ödemeyi yukarıdaki IBAN'a yaptıktan sonra aşağıdaki formu doldurun.</p>
+                <p>Tutar: <b id="modalPrice" style="color:var(--accent);"></b> TL</p>
                 <form id="purchaseForm">
                     <input type="hidden" id="pName">
                     <input type="hidden" id="pPrice">
-                    <label>Telegram Kullanıcı Adınız veya Telefonunuz:</label>
-                    <input type="text" id="customerContact" required placeholder="@kullaniciadi veya 0555...">
-                    <label>Ödemeyi Yaptığınıza Dair Açıklama / Dekont Notu:</label>
-                    <textarea id="paymentNote" placeholder="Örn: Resul Sakal adına havale yapıldı. Dekont No: 12345" required></textarea>
-                    
-                    <label style="margin-top:10px; display:block;"><b>Teslimat Yöntemi Seçin:</b></label>
-                    <select id="deliveryChoice" style="width:100%; padding:10px; background:#0f172a; color:white; border:1px solid #475569; border-radius:5px; margin-bottom:15px;">
-                        <option value="auto">🤖 Otomatik Sistemden Anında Teslim Al</option>
-                        <option value="admin">👤 Yetkili Admin ile Görüşerek Teslim Al (@SMSPATRONUM)</option>
-                    </select>
-
+                    <label>Telegram Kullanıcı Adınız:</label>
+                    <input type="text" id="customerContact" required placeholder="@kullaniciadi">
+                    <label>Dekont / Ödeme Açıklama Notu:</label>
+                    <textarea id="paymentNote" placeholder="Resul Sakal adına havale yapıldı..." required></textarea>
                     <button type="submit" class="btn" style="width:100%;">Ödeme Bildirimi Gönder</button>
                     <button type="button" onclick="closeModal()" style="background:#475569; color:white; border:none; padding:8px; width:100%; border-radius:5px; margin-top:10px; cursor:pointer;">İptal</button>
                 </form>
@@ -124,18 +154,18 @@ app.get('/index.html', (req, res) => {
                 
                 let html = '';
                 categories.forEach(cat => {
-                    html += \`<div class="category-title">📂 \${cat} Kategorisi</div><div class="grid">\`;
+                    let catName = cat === 'SMSOnay' ? '📱 SMS Onay & Numara Servisleri' : cat + ' Hizmetleri';
+                    html += \`<div class="category-title">\${catName}</div><div class="grid">\`;
                     allProducts.filter(p => p.category === cat).forEach(p => {
                         html += \`
                             <div class="card">
                                 <div>
                                     <h3>\${p.name}</h3>
                                     <p style="color:#94a3b8; font-size:0.9rem;">\${p.desc}</p>
-                                    <div style="font-size:0.8rem; color:#38bdf8;">📦 \${p.autoStock}</div>
                                 </div>
                                 <div>
                                     <div class="price">\${p.price} TL</div>
-                                    <button class="btn" onclick="openModal('\${p.name}', \${p.price})">Hemen Satın Al</button>
+                                    <button class="btn" onclick="openModal('\${p.name}', \${p.price})">Satın Al</button>
                                 </div>
                             </div>
                         \`;
@@ -153,35 +183,24 @@ app.get('/index.html', (req, res) => {
                 document.getElementById('orderModal').style.display = 'flex';
             }
 
-            function closeModal() {
-                document.getElementById('orderModal').style.display = 'none';
-            }
+            function closeModal() { document.getElementById('orderModal').style.display = 'none'; }
 
             document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const productName = document.getElementById('pName').value;
-                const price = document.getElementById('pPrice').value;
-                const customerContact = document.getElementById('customerContact').value;
-                const paymentNote = document.getElementById('paymentNote').value;
-                const deliveryChoice = document.getElementById('deliveryChoice').value;
-
                 const res = await fetch('/api/order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ productName, price, customerContact, paymentNote, deliveryChoice })
+                    body: JSON.stringify({
+                        productName: document.getElementById('pName').value,
+                        price: document.getElementById('pPrice').value,
+                        customerContact: document.getElementById('customerContact').value,
+                        paymentNote: document.getElementById('paymentNote').value
+                    })
                 });
                 const data = await res.json();
-                
                 if(data.success) {
-                    if(deliveryChoice === 'admin') {
-                        alert('Sipariş bildirimi admine iletildi! Lütfen @SMSPATRONUM adresine gidip dekontunuzu gönderin.');
-                        window.location.href = 'https://t.me/SMSPATRONUM';
-                    } else {
-                        alert('Ödeme bildiriminiz alındı! Otomatik teslimat için lütfen Telegram botumuzu ziyaret edin.');
-                        location.reload();
-                    }
-                } else {
-                    alert('Bir hata oluştu, lütfen tekrar deneyin.');
+                    alert('Sipariş bildirimi gönderildi! Lütfen @SMSPATRONUM adresine dekontunuzu iletin.');
+                    location.reload();
                 }
             });
         </script>
@@ -191,98 +210,203 @@ app.get('/index.html', (req, res) => {
 });
 
 app.get('/api/products', (req, res) => {
-  res.json({ 
-    success: true, 
-    products, 
-    iban: ADMIN_IBAN, 
-    holder: ACCOUNT_HOLDER,
-    support: SUPPORT_USERNAME 
-  });
+  res.json({ success: true, products, iban: ADMIN_IBAN, holder: ACCOUNT_HOLDER, support: SUPPORT_USERNAME });
 });
 
 app.post('/api/order', async (req, res) => {
-  const { productName, price, customerContact, paymentNote, deliveryChoice } = req.body;
-  
+  const { productName, price, customerContact, paymentNote } = req.body;
   try {
     const message = `🚨 *YENİ WEB SİPARİŞİ / ÖDEME BİLDİRİMİ!* 🚨\n\n` +
                     `📦 *Ürün:* ${productName}\n` +
                     `💰 *Tutar:* ${price} TL\n` +
-                    `👤 *Müşteri İletişim:* ${customerContact}\n` +
-                    `📝 *Dekont/Not:* ${paymentNote}\n` +
-                    `🚚 *Seçilen Teslimat:* ${deliveryChoice === 'admin' ? '👤 Admine Bağlanmak İstiyor' : '🤖 Otomatik / Bot İçi Teslimat'}\n\n` +
-                    `⚠️ Lütfen IBAN hesabınızı kontrol edip müşteriye onay verin!`;
+                    `👤 *Müşteri:* ${customerContact}\n` +
+                    `📝 *Not:* ${paymentNote}\n\n` +
+                    `💳 Alıcı: ${ACCOUNT_HOLDER} - ${ADMIN_IBAN}`;
 
     if (ADMIN_ID && ADMIN_ID !== "BURAYA_SENIN_TELEGRAM_USER_ID_YAZ") {
       await bot.telegram.sendMessage(ADMIN_ID, message, { parse_mode: 'Markdown' });
     }
-
-    res.json({ success: true, message: "Sipariş alındı." });
+    res.json({ success: true });
   } catch (err) {
-    console.error(err);
-    res.json({ success: true, message: "Sipariş alındı." });
+    res.json({ success: true });
   }
 });
 
-// TELEGRAM BOT KATEGORİLİ İNTERAKTİF MENÜ
+// TELEGRAM BOT
 bot.start((ctx) => {
   ctx.reply(
     `👑 *Anka VIP Medya & Bot Paneline Hoş Geldiniz!*\n\n` +
-    `Alıcı: *${ACCOUNT_HOLDER}*\n` +
-    `IBAN: \`${ADMIN_IBAN}\`\n\n` +
-    `Aşağıdaki kategorilerden dilediğiniz hizmeti inceleyebilir, ürünleri görebilir veya dilediğiniz an admine bağlanabilirsiniz.`,
+    `💳 *Ödeme Bilgilerimiz:*\n` +
+    `• Alıcı Adı Soyadı: *${ACCOUNT_HOLDER}*\n` +
+    `• IBAN: \`${ADMIN_IBAN}\`\n\n` +
+    `Lütfen işlem yapmak istediğiniz kategoriyi seçiniz:`,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('📸 Instagram Hizmetleri', 'cat_Instagram')],
-        [Markup.button.callback('🎵 TikTok Hizmetleri', 'cat_TikTok')],
-        [Markup.button.callback('📢 Telegram Hizmetleri', 'cat_Telegram')],
-        [Markup.button.callback('📁 Hesaplar & Numara / Mail', 'cat_Hesaplar')],
-        [Markup.button.url('🌐 Web Paneline Git (Tüm Ürünler)', 'https://' + (process.env.RENDER_EXTERNAL_URL ? process.env.RENDER_EXTERNAL_URL.replace('https://', '') : 'localhost:3000'))],
-        [Markup.button.url('👤 Doğrudan Admine Bağlan (@SMSPATRONUM)', 'https://t.me/SMSPATRONUM')]
+        [Markup.button.callback('📸 Instagram Hizmetleri', 'menu_Instagram')],
+        [Markup.button.callback('🎵 TikTok Hizmetleri', 'menu_TikTok')],
+        [Markup.button.callback('📢 Telegram Hizmetleri', 'menu_Telegram')],
+        [Markup.button.callback('📱 SMS Onay & Numara Servisleri', 'menu_SMSOnay')],
+        [Markup.button.url('🌐 Web Paneline Git', 'https://' + (process.env.RENDER_EXTERNAL_URL ? process.env.RENDER_EXTERNAL_URL.replace('https://', '') : 'localhost:3000'))],
+        [Markup.button.url('👤 Sorun Yaşarsanız Admine Bağlan (@SMSPATRONUM)', 'https://t.me/SMSPATRONUM')]
       ])
     }
   );
 });
 
-// Kategori Butonu Dinleyicileri
-['Instagram', 'TikTok', 'Telegram', 'Hesaplar'].forEach(category => {
-  bot.action(`cat_${category}`, async (ctx) => {
-    await ctx.answerCbQuery();
-    const filtered = products.filter(p => p.category === category);
-    let text = `📂 *${category} Kategorisi Ürünleri*:\n\n`;
-    
-    filtered.forEach(p => {
-      text += `🔹 *${p.name}*\n💰 Fiyat: *${p.price} TL*\n📝 ${p.desc}\n\n`;
-    });
-    
-    text += `💳 *Ödeme Bilgisi:*\nTutarınızı yukarıdaki IBAN'a yatırıp dekontla birlikte ya otomatikten alabilir ya da adminle görüşebilirsiniz.`;
-
-    await ctx.reply(text, {
+// Instagram Menü
+bot.action('menu_Instagram', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.reply(
+    `📸 *Instagram Hizmetleri*:\n💳 IBAN: \`${ADMIN_IBAN}\` (${ACCOUNT_HOLDER})\n\nPaket seçin:`,
+    {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('🔙 Ana Menüye Dön', 'main_menu')],
-        [Markup.button.url('👤 Ürünü Adminden Al / Destek Al', 'https://t.me/SMSPATRONUM')]
+        [Markup.button.callback('1️⃣ Düşmeyen Takipçi (500 Adet) - 450 TL', 'buy_1')],
+        [Markup.button.callback('2️⃣ Türk Beğeni (500 Adet) - 200 TL', 'buy_2')],
+        [Markup.button.callback('3️⃣ Gönderi İzlenme (10K) - 250 TL', 'buy_3')],
+        [Markup.button.callback('4️⃣ Ucuz Takipçi (100 Adet: 120 TL / 250 Adet: 270 TL)', 'buy_4_options')],
+        [Markup.button.callback('🔙 Ana Menüye Dön', 'main_menu')]
       ])
-    });
+    }
+  );
+});
+
+// TikTok Menü
+bot.action('menu_TikTok', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.reply(
+    `🎵 *TikTok Hizmetleri*:\n💳 IBAN: \`${ADMIN_IBAN}\` (${ACCOUNT_HOLDER})\n\nPaket seçin:`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('1️⃣ TikTok Takipçi (250 Adet) - 250 TL', 'buy_6')],
+        [Markup.button.callback('2️⃣ TikTok Beğeni (2500 Adet) - 300 TL', 'buy_7')],
+        [Markup.button.callback('3️⃣ TikTok İzlenme (100K: 10000 TL / 25K: 320 TL)', 'buy_8_options')],
+        [Markup.button.callback('4️⃣ PK Puan Savaşı (250 Adet) - 100 TL', 'buy_10')],
+        [Markup.button.callback('🔙 Ana Menüye Dön', 'main_menu')]
+      ])
+    }
+  );
+});
+
+// Telegram Menü
+bot.action('menu_Telegram', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.reply(
+    `📢 *Telegram Hizmetleri*:\n💳 IBAN: \`${ADMIN_IBAN}\` (${ACCOUNT_HOLDER})\n\nSeçenekler:`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('🔹 750 Abone - 350 TL', 'buy_11')],
+        [Markup.button.callback('🔙 Ana Menüye Dön', 'main_menu')]
+      ])
+    }
+  );
+});
+
+// SMS Onay Menüsü
+bot.action('menu_SMSOnay', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.reply(
+    `📱 *SMS Onay & Numara Servisleri*:\n` +
+    `Sistem *onaylasms.com.tr* API altyapısıyla çalışır. Ödeme sonrası anlık numara çekilir.\n` +
+    `💳 IBAN: \`${ADMIN_IBAN}\` (${ACCOUNT_HOLDER})\n\n` +
+    `Ülke ve Platform Seçiniz:`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('🇺🇸 Telegram ABD Numara (200 TL)', 'sms_usa_tg')],
+        [Markup.button.callback('🇹🇷 Telegram TR Numara (250 TL)', 'sms_turkey_tg')],
+        [Markup.button.callback('🇹🇷 WhatsApp TR Numara (320 TL)', 'sms_turkey_wa')],
+        [Markup.button.callback('🇵🇭 WhatsApp Filipinler (250 TL)', 'sms_philippines_wa')],
+        [Markup.button.callback('🇬🇧 WhatsApp İngiltere (250 TL)', 'sms_uk_wa')],
+        [Markup.button.callback('🔙 Ana Menüye Dön', 'main_menu')]
+      ])
+    }
+  );
+});
+
+// Normal Ürün Satın Alma Yönlendirmesi
+['buy_1', 'buy_2', 'buy_3', 'buy_4_options', 'buy_6', 'buy_7', 'buy_8_options', 'buy_10', 'buy_11'].forEach(action => {
+  bot.action(action, async (ctx) => {
+    await ctx.answerCbQuery();
+    ctx.reply(
+      `🛒 *Sipariş Bilgisi*\n\n` +
+      `💳 Ödemeyi yapacağınız IBAN:\n` +
+      `• Alıcı: *${ACCOUNT_HOLDER}*\n` +
+      `• IBAN: \`${ADMIN_IBAN}\`\n\n` +
+      `⚠️ Ödemeyi yaptıktan sonra dekontunuzla birlikte lütfen **@SMSPATRONUM** adresine yazınız.`,
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.url('👤 Adminden Teslim Al / Dekont Gönder', 'https://t.me/SMSPATRONUM')],
+          [Markup.button.callback('🔙 Ana Menü', 'main_menu')]
+        ])
+      }
+    );
+  });
+});
+
+// SMS Onay Butonları Tıklandığında onaylaSMS.com.tr API'den Numara Çekme Akışı
+const smsRoutes = [
+  { action: 'sms_usa_tg', service: 'tg', country: 'usa', name: 'Telegram ABD', price: 200 },
+  { action: 'sms_turkey_tg', service: 'tg', country: 'turkey', name: 'Telegram TR', price: 250 },
+  { action: 'sms_turkey_wa', service: 'wa', country: 'turkey', name: 'WhatsApp TR', price: 320 },
+  { action: 'sms_philippines_wa', service: 'wa', country: 'philippines', name: 'WhatsApp Filipinler', price: 250 },
+  { action: 'sms_uk_wa', service: 'wa', country: 'uk', name: 'WhatsApp İngiltere', price: 250 }
+];
+
+smsRoutes.forEach(item => {
+  bot.action(item.action, async (ctx) => {
+    await ctx.answerCbQuery();
+    
+    // API'den numara çekiliyor
+    const apiResult = await getNumberFromAPI(item.service, item.country);
+    
+    if (!apiResult.success) {
+      return ctx.reply(
+        `❌ Şuan bu ülkede stok bulunamadı veya API yanıtı: ${apiResult.message}\nLütfen birazdan tekrar deneyin veya adminle iletişime geçin.`,
+        Markup.inlineKeyboard([[Markup.button.callback('🔙 Ana Menü', 'main_menu')]])
+      );
+    }
+
+    const { activationId, phoneNumber } = apiResult;
+
+    ctx.reply(
+      `📱 *${item.name} Numaranız Başarıyla Çekildi!*\n\n` +
+      `📞 Numara: \`+${phoneNumber}\`\n` +
+      `💰 Tutar: *${item.price} TL*\n` +
+      `💳 Alıcı: *${ACCOUNT_HOLDER}* (\`${ADMIN_IBAN}\`)\n\n` +
+      `⚠️ Lütfen ödemeyi yukarıdaki IBAN'a yapıp dekontu @SMSPATRONUM adresine iletin. Ödemeniz onaylandığında SMS kodunuz otomatik olarak buraya gelecektir!`,
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.url('👤 Ödemeyi Yaptım, Dekont Gönder', 'https://t.me/SMSPATRONUM')],
+          [Markup.button.callback('🔄 Kod Gelmedi / Numara Değiştir', item.action)],
+          [Markup.button.callback('🔙 Ana Menü', 'main_menu')]
+        ])
+      }
+    );
   });
 });
 
 bot.action('main_menu', async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.reply(
+  ctx.reply(
     `👑 *Anka VIP Ana Menü:*`,
     Markup.inlineKeyboard([
-      [Markup.button.callback('📸 Instagram Hizmetleri', 'cat_Instagram')],
-      [Markup.button.callback('🎵 TikTok Hizmetleri', 'cat_TikTok')],
-      [Markup.button.callback('📢 Telegram Hizmetleri', 'cat_Telegram')],
-      [Markup.button.callback('📁 Hesaplar & Numara / Mail', 'cat_Hesaplar')],
-      [Markup.button.url('👤 Doğrudan Admine Bağlan', 'https://t.me/SMSPATRONUM')]
+      [Markup.button.callback('📸 Instagram Hizmetleri', 'menu_Instagram')],
+      [Markup.button.callback('🎵 TikTok Hizmetleri', 'menu_TikTok')],
+      [Markup.button.callback('📢 Telegram Hizmetleri', 'menu_Telegram')],
+      [Markup.button.callback('📱 SMS Onay & Numara Servisleri', 'menu_SMSOnay')],
+      [Markup.button.url('👤 Sorun Yaşarsanız Admine Bağlan', 'https://t.me/SMSPATRONUM')]
     ])
   );
 });
 
 bot.launch().then(() => {
-  console.log("Telegram Bot kategorili menüyle aktif!");
+  console.log("Telegram Bot onaylasms.com.tr API ve tam menü ile aktif!");
 }).catch(err => {
   console.log("Bot başlatılırken hata oluştu:", err.message);
 });
