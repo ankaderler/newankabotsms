@@ -97,7 +97,7 @@ async function sendTelegramMessage(text, replyMarkup = null) {
     });
 }
 
-// 4K ANKA KUŞU TAM EKRAN ANİMASYONLU ARAYÜZ
+// 4K GERÇEK ANKA KUŞU TAM EKRAN ANİMASYONLU ARAYÜZ
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr">
@@ -124,7 +124,7 @@ app.get('/', (req, res) => {
             overflow-x: hidden;
         }
         
-        /* 4K TAM EKRAN ANKA KUŞU AÇILIŞ / KANATLANMA EKRANI */
+        /* 4K TAM EKRAN GERÇEK ANKA KUŞU AÇILIŞ / KANATLANMA EKRANI */
         #splashScreen {
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
@@ -140,14 +140,14 @@ app.get('/', (req, res) => {
         .splash-bg-phoenix {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2560&auto=format&fit=crop') no-repeat center center;
+            background: url('https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=2560&auto=format&fit=crop') no-repeat center center;
             background-size: cover;
-            filter: brightness(0.6) contrast(1.2);
+            filter: brightness(0.65) contrast(1.25);
             animation: phoenixFlyZoom 3.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
         @keyframes phoenixFlyZoom {
-            0% { transform: scale(1); opacity: 0.8; }
-            100% { transform: scale(1.18); opacity: 1; }
+            0% { transform: scale(1); opacity: 0.7; }
+            100% { transform: scale(1.15); opacity: 1; }
         }
         .splash-content {
             position: relative;
@@ -162,7 +162,7 @@ app.get('/', (req, res) => {
             border: 4px solid var(--gold-light);
             box-shadow: 0 0 70px rgba(212, 175, 55, 0.9), inset 0 0 30px rgba(254, 240, 138, 0.8);
             margin: 0 auto 20px auto;
-            background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop') no-repeat center center;
+            background: url('https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=1000&auto=format&fit=crop') no-repeat center center;
             background-size: cover;
             animation: wingFlapPulse 2s infinite alternate ease-in-out;
         }
@@ -363,7 +363,7 @@ app.get('/', (req, res) => {
         <!-- GİRİŞ / KAYIT EKRANI -->
         <div id="authScreen" class="auth-wrapper" style="display:none;">
             <div class="auth-box">
-                <div style="width:70px; height:70px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin:0 auto 15px auto; box-shadow:0 0 20px rgba(212,175,55,0.6); background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop') no-repeat center center; background-size: cover;"></div>
+                <div style="width:70px; height:70px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin:0 auto 15px auto; box-shadow:0 0 20px rgba(212,175,55,0.6); background: url('https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=400&auto=format&fit=crop') no-repeat center center; background-size: cover;"></div>
                 <h2>🦅 ANKA VIP Panel</h2>
                 
                 <div class="auth-tabs">
@@ -386,7 +386,7 @@ app.get('/', (req, res) => {
         <!-- ANA PANEL EKRANI -->
         <div id="panelScreen" style="display:none;">
             <header>
-                <div style="display:inline-block; width:65px; height:65px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin-bottom:10px; box-shadow:0 0 20px rgba(212,175,55,0.5); background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop') no-repeat center center; background-size: cover;"></div>
+                <div style="display:inline-block; width:65px; height:65px; border-radius:50%; border:2px solid var(--gold-primary); overflow:hidden; margin-bottom:10px; box-shadow:0 0 20px rgba(212,175,55,0.5); background: url('https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=400&auto=format&fit=crop') no-repeat center center; background-size: cover;"></div>
                 <h1>🦅 ANKA SERVİS - Elite Panel</h1>
                 <p>Güvenli Sosyal Medya & Otomatik Numara Çözümleri</p>
                 <div class="iban-box" onclick="copyIban()" title="Kopyalamak için tıklayın">
@@ -460,7 +460,7 @@ app.get('/', (req, res) => {
     <div id="copyAlert" class="copy-alert">📋 IBAN Panoya Kopyalandı!</div>
 
     <script>
-        // 3 saniye ihtişamlı 4K Anka uçuş animasyonundan sonra paneli göster
+        // 3 saniye muhteşem 4K Gerçek Anka uçuş animasyonundan sonra paneli göster
         setTimeout(() => {
             const splash = document.getElementById('splashScreen');
             splash.style.opacity = '0';
@@ -715,5 +715,5 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 ANKA SERVİS 4K Phoenix VIP Panel ${PORT} portunda aktif!`);
+    console.log(`🚀 ANKA SERVİS 4K Gerçek Phoenix VIP Panel ${PORT} portunda aktif!`);
 });
