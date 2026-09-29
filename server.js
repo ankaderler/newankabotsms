@@ -28,6 +28,7 @@ try {
 // Geçici Bellek Veritabanı
 let users = {
     "admin": { balance: 9999.00, password: "admin123", role: "admin" },
+    "resul": { balance: 1500.00, password: "123", role: "admin" }, // Örnek Admin
     "aklomanti": { balance: 1500.00, password: "123", role: "user" }
 };
 let pendingPayments = {}; 
@@ -68,7 +69,7 @@ app.post('/api/auth/register', (req, res) => {
     res.json({ success: true, message: 'Kayıt başarılı! 25 TL bonus hesabınıza eklendi.', username, balance: 25.00, role: "user" });
 });
 
-// ADMİN İŞLEMLERİ
+// ADMİN İŞLEMLERİ (Web Paneli İçin)
 app.post('/api/admin/updateBalance', (req, res) => {
     const { adminUsername, targetUsername, newBalance } = req.body;
     if (!users[adminUsername] || users[adminUsername].role !== 'admin') return res.status(403).json({ success: false, message: 'Yetkisiz işlem!' });
@@ -77,6 +78,7 @@ app.post('/api/admin/updateBalance', (req, res) => {
     users[targetUsername].balance = parseFloat(newBalance);
     res.json({ success: true, message: `${targetUsername} bakiyesi güncellendi.` });
 });
+
 app.get('/api/admin/getUsers', (req, res) => {
     const { adminUsername } = req.query;
     if (!users[adminUsername] || users[adminUsername].role !== 'admin') return res.status(403).json({ success: false });
@@ -85,7 +87,31 @@ app.get('/api/admin/getUsers', (req, res) => {
     res.json({ success: true, users: userList });
 });
 
-// NUMARA ÇEKME SİSTEMİ
+app.get('/api/admin/getPendingPayments', (req, res) => {
+    const { adminUsername } = req.query;
+    if (!users[adminUsername] || users[adminUsername].role !== 'admin') return res.status(403).json({ success: false });
+    res.json({ success: true, payments: pendingPayments });
+});
+
+app.post('/api/admin/processPayment', (req, res) => {
+    const { adminUsername, paymentId, action } = req.body;
+    if (!users[adminUsername] || users[adminUsername].role !== 'admin') return res.status(403).json({ success: false, message: 'Yetkisiz!' });
+    
+    const payment = pendingPayments[paymentId];
+    if (!payment || payment.status !== 'pending') return res.status(400).json({ success: false, message: 'Ödeme bulunamadı veya zaten işlenmiş.' });
+
+    if (action === 'approve') {
+        if (!users[payment.username]) users[payment.username] = { balance: 0, password: '123', role: 'user' };
+        users[payment.username].balance += payment.amount;
+        payment.status = 'approved';
+        res.json({ success: true, message: 'Ödeme onaylandı ve bakiye yüklendi.' });
+    } else {
+        payment.status = 'rejected';
+        res.json({ success: true, message: 'Ödeme reddedildi.' });
+    }
+});
+
+// SORUNSUZ NUMARA ÇEKME SİSTEMİ
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 app.post('/api/buyNumber', async (req, res) => {
@@ -95,75 +121,81 @@ app.post('/api/buyNumber', async (req, res) => {
     if (!product) return res.status(400).json({ success: false, message: 'Ürün bulunamadı.' });
     if (users[username].balance < product.price) return res.status(400).json({ success: false, message: `Bakiyeniz yetersiz!` });
 
-    const maxRetries = 15;
+    const maxRetries = 10;
     let attempt = 0;
     while (attempt < maxRetries) {
         attempt++;
         try {
             const apiCallUrl = `${API_URL}?api_key=${API_KEY}&action=getNumber&service=${product.service}&country=${product.country}&operator=any`;
-            const response = await axios.get(apiCallUrl);
+            const response = await axios.get(apiCallUrl, { timeout: 8000 });
             const data = typeof response.data === 'string' ? response.data.trim() : String(response.data);
 
             if (data.startsWith('ACCESS_NUMBER')) {
                 users[username].balance -= product.price;
                 const parts = data.split(':');
-                activeNumbers.push({ activationId: parts[1], phoneNumber: parts[2], username, productName: product.name, status: 'WAITING', code: null });
-                return res.json({ success: true, activationId: parts[1], phoneNumber: parts[2], remainingBalance: users[username].balance });
-            } else if (data === 'NO_NUMBERS') {
-                await sleep(2500);
+                const activationId = parts[1];
+                const phoneNumber = parts[2];
+                
+                activeNumbers.push({ activationId, phoneNumber, username, productName: product.name, status: 'WAITING', code: null });
+                return res.json({ success: true, activationId, phoneNumber, remainingBalance: users[username].balance });
+            } else if (data === 'NO_NUMBERS' || data === 'STATUS_WAIT_PNUM') {
+                await sleep(2000);
+            } else if (data.startsWith('BAD_KEY') || data.startsWith('ERROR')) {
+                return res.status(400).json({ success: false, message: `API Sağlayıcı Hatası: ${data}` });
             } else {
-                return res.status(400).json({ success: false, message: `API Hatası: ${data}` });
+                await sleep(1500);
             }
         } catch (error) {
-            return res.status(500).json({ success: false, message: 'Bağlantı hatası.' });
+            console.error('Numara çekme bağlantı hatası:', error.message);
         }
     }
-    res.status(400).json({ success: false, message: 'Anlık numara kalmadı, lütfen tekrar deneyin.' });
+    res.status(400).json({ success: false, message: 'Şu an bu serviste müsait numara bulunamadı, lütfen biraz sonra tekrar deneyin.' });
 });
 
 // KOD KONTROLÜ
 app.get('/api/checkSms/:activationId', async (req, res) => {
     const { activationId } = req.params;
     try {
-        const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getStatus&id=${activationId}`);
-        const resultText = response.data;
+        const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getStatus&id=${activationId}`, { timeout: 5000 });
+        const resultText = typeof response.data === 'string' ? response.data.trim() : String(response.data);
         let record = activeNumbers.find(a => a.activationId === activationId);
 
-        if (typeof resultText === 'string' && resultText.startsWith('STATUS_OK')) {
+        if (resultText.startsWith('STATUS_OK')) {
             const smsCode = resultText.split(':')[1];
-            if(record) { record.status = 'COMPLETED'; record.code = smsCode; }
+            if (record) { record.status = 'COMPLETED'; record.code = smsCode; }
             return res.json({ success: true, status: 'completed', code: smsCode });
         }
         return res.json({ success: true, status: 'waiting' });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Hata.' });
+        res.json({ success: true, status: 'waiting' });
     }
 });
 
 // SORGU PANELİ
 app.post('/api/querySms', async (req, res) => {
     const { query } = req.body;
-    if (!query) return res.status(400).json({ success: false, message: 'Giriş yapın.' });
+    if (!query) return res.status(400).json({ success: false, message: 'Arama terimi girin.' });
     let found = activeNumbers.find(a => a.activationId === query || a.phoneNumber.includes(query));
     if (found) {
         try {
             const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getStatus&id=${found.activationId}`);
-            if (typeof response.data === 'string' && response.data.startsWith('STATUS_OK')) {
-                found.status = 'COMPLETED'; found.code = response.data.split(':')[1];
+            const resultText = typeof response.data === 'string' ? response.data.trim() : String(response.data);
+            if (resultText.startsWith('STATUS_OK')) {
+                found.status = 'COMPLETED'; found.code = resultText.split(':')[1];
             }
         } catch(e) {}
         return res.json({ success: true, item: found });
     }
-    res.status(404).json({ success: false, message: 'Bulunamadı.' });
+    res.status(404).json({ success: false, message: 'Kayıt bulunamadı.' });
 });
 
-// TELEGRAM BUTONLU ÖDEME BİLDİRİMİ
+// TELEGRAM & WEB ORTAK ÖDEME BİLDİRİMİ
 app.post('/api/deposit/notify', async (req, res) => {
     const { username, senderName, amount } = req.body;
     if (!senderName || !amount) return res.status(400).json({ success: false, message: 'Eksik bilgi.' });
 
     const paymentId = 'pay_' + Date.now();
-    pendingPayments[paymentId] = { username, amount: parseFloat(amount), status: 'pending' };
+    pendingPayments[paymentId] = { id: paymentId, username, amount: parseFloat(amount), senderName, status: 'pending', time: new Date().toLocaleTimeString() };
 
     if (bot) {
         bot.sendMessage(TELEGRAM_CHAT_ID, `💰 *Yeni Bakiye Bildirimi*\n\n👤 Kullanıcı: ${username}\n💳 Gönderen: ${senderName}\n💵 Tutar: ${amount} TL\n\nOnaylıyor musunuz?`, {
@@ -171,29 +203,32 @@ app.post('/api/deposit/notify', async (req, res) => {
             reply_markup: {
                 inline_keyboard: [[{ text: '✅ Onayla', callback_data: `approve_${paymentId}` }, { text: '❌ Reddet', callback_data: `reject_${paymentId}` }]]
             }
-        }).catch(err => console.error(err));
+        }).catch(err => console.error('Telegram Mesaj Hatası:', err.message));
     }
-    res.json({ success: true, message: 'Bildirim yöneticiye iletildi.' });
+    res.json({ success: true, message: 'Ödeme bildiriminiz iletildi. Onay bekleniyor.' });
 });
 
 if (bot) {
     bot.on('callback_query', (query) => {
         const data = query.data;
         const action = data.split('_')[0]; 
-        const payment = pendingPayments[data.replace(`${action}_`, '')];
+        const paymentId = data.replace(`${action}_`, '');
+        const payment = pendingPayments[paymentId];
 
-        if (!payment || payment.status !== 'pending') return bot.answerCallbackQuery(query.id, { text: 'Sonuçlanmış.', show_alert: true });
+        if (!payment || payment.status !== 'pending') {
+            return bot.answerCallbackQuery(query.id, { text: 'Bu işlem daha önce sonuçlanmış.', show_alert: true });
+        }
 
         if (action === 'approve') {
-            if(!users[payment.username]) users[payment.username] = { balance: 0, password: '123' };
+            if (!users[payment.username]) users[payment.username] = { balance: 0, password: '123', role: 'user' };
             users[payment.username].balance += payment.amount;
             payment.status = 'approved';
-            bot.editMessageText(query.message.text + `\n\n✅ *ONAYLANDI*`, { chat_id: query.message.chat.id, message_id: query.message.message_id, parse_mode: 'Markdown' });
+            bot.editMessageText(query.message.text + `\n\n✅ *ONAYLANDI (Telegram)*`, { chat_id: query.message.chat.id, message_id: query.message.message_id, parse_mode: 'Markdown' }).catch(()=>{});
         } else {
             payment.status = 'rejected';
-            bot.editMessageText(query.message.text + `\n\n❌ *REDDEDİLDİ*`, { chat_id: query.message.chat.id, message_id: query.message.message_id, parse_mode: 'Markdown' });
+            bot.editMessageText(query.message.text + `\n\n❌ *REDDEDİLDİ (Telegram)*`, { chat_id: query.message.chat.id, message_id: query.message.message_id, parse_mode: 'Markdown' }).catch(()=>{});
         }
-        bot.answerCallbackQuery(query.id, { text: 'İşlem yapıldı.' });
+        bot.answerCallbackQuery(query.id, { text: 'İşlem başarıyla gerçekleştirildi.' });
     });
 }
 
@@ -211,7 +246,7 @@ app.get('/', (req, res) => {
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f8fafc; overflow-x: hidden; }
         #matrix-canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; opacity: 0.55; pointer-events: none; }
-        .glass { background: rgba(15, 23, 42, 0.82); backdrop-filter: blur(16px); border: 1px solid rgba(34, 197, 94, 0.35); }
+        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(34, 197, 94, 0.35); }
         .glass-card { background: rgba(30, 41, 59, 0.70); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.15); transition: all 0.3s; }
         .glass-card:hover { transform: translateY(-4px); border-color: rgba(34, 197, 94, 0.8); }
         .animate-modal { animation: modalAnim 0.3s forwards; }
@@ -231,7 +266,9 @@ app.get('/', (req, res) => {
             </div>
         </div>
         <div class="flex items-center space-x-2.5">
-            <button id="admin-btn" onclick="openAdminModal()" class="hidden bg-rose-600 hover:bg-rose-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition">Admin Paneli</button>
+            <button id="admin-btn" onclick="openAdminModal()" class="hidden bg-rose-600 hover:bg-rose-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-rose-900/30">
+                <i class="fa-solid fa-gauge mr-1"></i> Admin Paneli
+            </button>
             <button onclick="openQueryModal()" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3.5 py-2 rounded-xl text-xs font-bold">
                 <i class="fa-solid fa-search"></i> Sorgu
             </button>
@@ -253,18 +290,34 @@ app.get('/', (req, res) => {
 
     <!-- Admin Modal -->
     <div id="admin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="glass w-full max-w-lg rounded-3xl p-7 relative animate-modal">
+        <div class="glass w-full max-w-2xl rounded-3xl p-7 relative animate-modal max-h-[90vh] overflow-y-auto">
             <button onclick="closeAdminModal()" class="absolute top-5 right-5 text-slate-400 w-8 h-8 rounded-xl bg-slate-800/80"><i class="fa-solid fa-xmark"></i></button>
             <h3 class="text-base font-extrabold text-white mb-4"><i class="fa-solid fa-lock text-rose-500"></i> Yönetim Paneli</h3>
-            <div class="space-y-4">
-                <div class="flex gap-2">
-                    <input type="text" id="admin-target-user" placeholder="Kullanıcı Adı" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white">
-                    <input type="number" id="admin-new-balance" placeholder="Yeni Bakiye (TL)" class="w-32 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white">
-                    <button onclick="adminUpdateBalance()" class="bg-rose-600 text-white px-4 rounded-xl text-xs font-bold">Güncelle</button>
+            
+            <div class="space-y-6">
+                <!-- Bakiye Güncelleme Alanı -->
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+                    <h4 class="text-xs font-bold text-emerald-400 mb-3">Kullanıcı Bakiye Düzenle</h4>
+                    <div class="flex gap-2">
+                        <input type="text" id="admin-target-user" placeholder="Kullanıcı Adı" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white">
+                        <input type="number" id="admin-new-balance" placeholder="Yeni Bakiye" class="w-32 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white">
+                        <button onclick="adminUpdateBalance()" class="bg-rose-600 hover:bg-rose-500 text-white px-4 rounded-xl text-xs font-bold">Güncelle</button>
+                    </div>
                 </div>
-                <div class="bg-slate-900 rounded-xl p-4 max-h-60 overflow-y-auto">
+
+                <!-- Web Üzerinden Bekleyen Ödemeler Onay Alanı -->
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+                    <h4 class="text-xs font-bold text-amber-400 mb-3">Onay Bekleyen Ödemeler (Web)</h4>
+                    <div id="admin-pending-payments" class="space-y-2 max-h-40 overflow-y-auto">
+                        <p class="text-xs text-slate-500">Yükleniyor...</p>
+                    </div>
+                </div>
+
+                <!-- Kullanıcı Listesi -->
+                <div class="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 max-h-48 overflow-y-auto">
+                    <h4 class="text-xs font-bold text-blue-400 mb-3">Kayıtlı Kullanıcılar</h4>
                     <table class="w-full text-xs text-left text-slate-300" id="admin-users-table">
-                        <thead class="text-slate-400 border-b border-slate-700"><tr><th class="pb-2">Kullanıcı</th><th class="pb-2">Bakiye</th></tr></thead>
+                        <thead class="text-slate-400 border-b border-slate-700"><tr><th class="pb-2">Kullanıcı</th><th class="pb-2">Rol</th><th class="pb-2">Bakiye</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -272,7 +325,7 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
-    <!-- Deposit Modal (GÜNCELLENMİŞ BİLGİLER) -->
+    <!-- Deposit Modal -->
     <div id="deposit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
         <div class="glass w-full max-w-sm rounded-3xl p-7 relative animate-modal">
             <button onclick="closeDepositModal()" class="absolute top-5 right-5 text-slate-400 w-8 h-8 rounded-xl bg-slate-800/80"><i class="fa-solid fa-xmark"></i></button>
@@ -284,7 +337,7 @@ app.get('/', (req, res) => {
                 <p class="text-xs text-emerald-400 font-mono font-bold tracking-widest bg-slate-950 p-2 rounded-lg text-center mt-1">TR62 0006 2000 5000 0006 8107 73</p>
             </div>
 
-            <p class="text-[10px] text-slate-400 mb-3 text-center">Ödemeyi yaptıktan sonra aşağıdaki formu doldurun.</p>
+            <p class="text-[10px] text-slate-400 mb-3 text-center">Ödemeyi yaptıktan sonra formu gönderin.</p>
             <div class="space-y-3">
                 <input type="text" id="dep-sender" placeholder="Gönderici Adı Soyadı" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
                 <input type="number" id="dep-amount" placeholder="Yüklenen Tutar (TL)" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
@@ -455,7 +508,7 @@ app.get('/', (req, res) => {
         }
         function closeOrderModal() { document.getElementById('order-modal').classList.add('hidden'); clearInterval(checkInterval); }
         async function executeBuy() {
-            const btn = document.getElementById('buy-btn'); btn.innerText = 'Aranıyor...'; btn.disabled = true;
+            const btn = document.getElementById('buy-btn'); btn.innerText = 'Numara Aranıyor...'; btn.disabled = true;
             const r = await fetch('/api/buyNumber', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({productKey: selProd.id, username: currentUsername}) });
             const j = await r.json();
             btn.innerText = 'Satın Al'; btn.disabled = false;
@@ -485,21 +538,54 @@ app.get('/', (req, res) => {
 
         async function openAdminModal() {
             document.getElementById('admin-modal').classList.remove('hidden');
+            loadAdminData();
+        }
+        function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
+
+        async function loadAdminData() {
             const r = await fetch(\`/api/admin/getUsers?adminUsername=\${currentUsername}\`);
             const j = await r.json();
             if(j.success) {
                 document.querySelector('#admin-users-table tbody').innerHTML = j.users.map(u => \`
                     <tr class="border-b border-slate-800">
-                        <td class="py-2">\${u.username} \${u.role==='admin'?'<i class="fa-solid fa-star text-amber-400 ml-1"></i>':''}</td>
+                        <td class="py-2">\${u.username}</td>
+                        <td class="py-2 text-slate-400">\${u.role}</td>
                         <td class="py-2 text-emerald-400 font-bold">\${u.balance} TL</td>
                     </tr>
                 \`).join('');
             }
+
+            const pr = await fetch(\`/api/admin/getPendingPayments?adminUsername=\${currentUsername}\`);
+            const pj = await pr.json();
+            if(pj.success) {
+                const paymentsArr = Object.values(pj.payments).filter(p => p.status === 'pending');
+                if(paymentsArr.length === 0) {
+                    document.getElementById('admin-pending-payments').innerHTML = '<p class="text-xs text-slate-500">Bekleyen ödeme yok.</p>';
+                } else {
+                    document.getElementById('admin-pending-payments').innerHTML = paymentsArr.map(p => \`
+                        <div class="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
+                            <div>
+                                <span class="text-white font-bold">\${p.username}</span> - <span class="text-emerald-400">\${p.amount} TL</span><br>
+                                <span class="text-[10px] text-slate-400">Gönderen: \${p.senderName} (\${p.time})</span>
+                            </div>
+                            <div class="space-x-1">
+                                <button onclick="processPayment('\${p.id}', 'approve')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold">Onayla</button>
+                                <button onclick="processPayment('\${p.id}', 'reject')" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg font-bold">Reddet</button>
+                            </div>
+                        </div>
+                    \`).join('');
+                }
+            }
         }
-        function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
+
         async function adminUpdateBalance() {
             const r = await fetch('/api/admin/updateBalance', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({adminUsername: currentUsername, targetUsername: document.getElementById('admin-target-user').value, newBalance: document.getElementById('admin-new-balance').value}) });
-            const j = await r.json(); alert(j.message); if(j.success) openAdminModal();
+            const j = await r.json(); alert(j.message); if(j.success) loadAdminData();
+        }
+
+        async function processPayment(paymentId, action) {
+            const r = await fetch('/api/admin/processPayment', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({adminUsername: currentUsername, paymentId, action}) });
+            const j = await r.json(); alert(j.message); if(j.success) loadAdminData();
         }
     </script>
 </body>
