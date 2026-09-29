@@ -35,10 +35,11 @@ let visitorsCount = 0;
 let recentVisitors = [];
 let depositRequests = [];
 
-// GÜNCELLENMİŞ KATALOG VE FİYATLAR (Telegram TR: 200 TL)
+// GÜNCELLENMİŞ KATALOG (Telegram TR, Telegram İngiltere ve WhatsApp servisleri)
 const ankaCatalog = [
     { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, category: "WhatsApp", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
     { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 200, category: "Telegram", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
+    { id: "tg_uk", service: "tg", country: "2", name: "Telegram İngiltere", price: 180, category: "Telegram", icon: "fa-telegram", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
     { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 200, category: "WhatsApp", icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
     { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 150, category: "WhatsApp", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" }
 ];
@@ -213,7 +214,7 @@ app.post('/api/admin/action', (req, res) => {
     res.json({ success: true, message: `İşlem güncellendi: ${dep.status}` });
 });
 
-// ULTRA MODERN ÖN YÜZ (HACKER ARKA PLANLI)
+// ULTRA MODERN ÖN YÜZ (HAREKETLİ MATRİX EFEKTİ VE BELİRGİN ARKA PLAN)
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr" class="dark">
@@ -227,14 +228,34 @@ app.get('/', (req, res) => {
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         body { 
             font-family: 'Plus Jakarta Sans', sans-serif; 
-            background: linear-gradient(rgba(3, 7, 18, 0.88), rgba(3, 7, 18, 0.92)), url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1920&auto=format&fit=crop') no-repeat center center fixed;
-            background-size: cover;
+            background-color: #030712;
             color: #f8fafc; 
             overflow-x: hidden; 
         }
-        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(24px); border: 1px solid rgba(59, 130, 246, 0.18); }
-        .glass-card { background: rgba(30, 41, 59, 0.55); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .glass-card:hover { transform: translateY(-6px); border-color: rgba(34, 197, 94, 0.5); box-shadow: 0 20px 40px -15px rgba(34, 197, 94, 0.25); }
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -2;
+            opacity: 0.55;
+            pointer-events: none;
+        }
+        .bg-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(3, 7, 18, 0.45), rgba(3, 7, 18, 0.65)), url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1920&auto=format&fit=crop') no-repeat center center fixed;
+            background-size: cover;
+            z-index: -1;
+            pointer-events: none;
+        }
+        .glass { background: rgba(15, 23, 42, 0.82); backdrop-filter: blur(16px); border: 1px solid rgba(34, 197, 94, 0.35); }
+        .glass-card { background: rgba(30, 41, 59, 0.70); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.15); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .glass-card:hover { transform: translateY(-6px); border-color: rgba(34, 197, 94, 0.8); box-shadow: 0 20px 40px -15px rgba(34, 197, 94, 0.4); }
         @keyframes modalAnim { from { opacity: 0; transform: scale(0.85) translateY(30px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .animate-modal { animation: modalAnim 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .support-float { animation: floatAnim 3s ease-in-out infinite; }
@@ -244,13 +265,16 @@ app.get('/', (req, res) => {
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between selection:bg-emerald-600 selection:text-white">
+    <canvas id="matrix-canvas"></canvas>
+    <div class="bg-overlay"></div>
+
     <div id="splash-screen">
         <div class="splash-logo-box mb-5 relative z-10"><i class="fa-solid fa-terminal text-white text-3xl"></i></div>
         <h1 class="text-xl sm:text-2xl font-extrabold tracking-wider bg-gradient-to-r from-emerald-400 via-teal-300 to-white bg-clip-text text-transparent relative z-10">ANKA CIA SMS</h1>
         <p class="text-[11px] text-slate-400 mt-2 tracking-widest uppercase relative z-10">Güvenli Altyapı Yükleniyor...</p>
     </div>
 
-    <header class="glass sticky top-0 z-40 border-b border-emerald-500/20 px-6 py-4 flex items-center justify-between">
+    <header class="glass sticky top-0 z-40 border-b border-emerald-500/30 px-6 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3 cursor-pointer" onclick="location.reload()">
             <div class="w-10 h-10 bg-gradient-to-tr from-emerald-600 via-teal-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
                 <i class="fa-solid fa-shield-halved text-white text-lg"></i>
@@ -261,7 +285,7 @@ app.get('/', (req, res) => {
             </div>
         </div>
         <div class="flex items-center space-x-2.5">
-            <div class="glass px-3.5 py-2 rounded-2xl flex items-center space-x-2 text-xs border-emerald-500/20 shadow-inner">
+            <div class="glass px-3.5 py-2 rounded-2xl flex items-center space-x-2 text-xs border-emerald-500/30 shadow-inner">
                 <i class="fa-solid fa-wallet text-emerald-400"></i>
                 <span class="text-slate-400 hidden sm:inline">Bakiye:</span>
                 <span id="customer-balance" class="font-extrabold text-emerald-400 text-xs sm:text-sm">0.00 TL</span>
@@ -280,7 +304,7 @@ app.get('/', (req, res) => {
     </header>
 
     <main class="max-w-5xl mx-auto px-4 py-10 w-full flex-grow">
-        <div class="relative overflow-hidden glass p-8 rounded-3xl mb-10 border border-emerald-500/25 bg-gradient-to-r from-slate-950/70 via-slate-900/80 to-emerald-950/40 shadow-2xl">
+        <div class="relative overflow-hidden glass p-8 rounded-3xl mb-10 border border-emerald-500/35 bg-gradient-to-r from-slate-950/80 via-slate-900/90 to-emerald-950/50 shadow-2xl">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Anında Sanal Numara Al</h1>
                 <span class="text-lg sm:text-2xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-blue-400 drop-shadow-md">ANKA CIA SMS HİZMETLERİ</span>
@@ -291,7 +315,7 @@ app.get('/', (req, res) => {
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
             <div class="relative w-full sm:w-80">
                 <i class="fa-solid fa-search absolute left-4 top-3.5 text-slate-400 text-xs"></i>
-                <input type="text" id="search-input" oninput="filterServices()" placeholder="Servis ara (WhatsApp, Telegram...)" class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500 transition">
+                <input type="text" id="search-input" oninput="filterServices()" placeholder="" class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500 transition">
             </div>
             <div class="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0" id="category-filters">
                 <button onclick="filterCategory('Tümü')" class="cat-btn bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Tümü</button>
@@ -344,12 +368,12 @@ app.get('/', (req, res) => {
             </div>
             <form id="login-form" onsubmit="handleLogin(event)" class="space-y-3.5">
                 <input type="text" id="login-username" placeholder="Kullanıcı Adı" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
-                <input type="password" id="login-password" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
+                <input type="password" id="login-password" autocomplete="new-password" value="" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
                 <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-emerald-600/30">Giriş Yap</button>
             </form>
             <form id="register-form" onsubmit="handleRegister(event)" class="space-y-3.5 hidden">
                 <input type="text" id="reg-username" placeholder="Kullanıcı Adı" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
-                <input type="password" id="reg-password" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
+                <input type="password" id="reg-password" autocomplete="new-password" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
                 <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-emerald-600/30">Kayıt Ol (+25 TL Bonus)</button>
             </form>
         </div>
@@ -398,9 +422,41 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
-    <footer class="glass border-t border-emerald-500/20 text-center py-6 text-[11px] text-slate-500">&copy; 2026 ANKA CIA SMS HİZMETLERİ - Tüm Hakları Saklıdır.</footer>
+    <footer class="glass border-t border-emerald-500/30 text-center py-6 text-[11px] text-slate-500">&copy; 2026 ANKA CIA SMS HİZMETLERİ - Tüm Hakları Saklıdır.</footer>
 
     <script>
+        // Matrix Yağmur Efekti
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const chars = '0101010101010101ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%&*+';
+        const fontSize = 14;
+        let columns = canvas.width / fontSize;
+        let drops = [];
+        for(let i = 0; i < columns; i++) { drops[i] = 1; }
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(3, 7, 18, 0.08)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#10b981';
+            ctx.font = fontSize + 'px monospace';
+            for(let i = 0; i < drops.length; i++) {
+                const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if(drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        setInterval(drawMatrix, 35);
+
         window.addEventListener('load', () => { setTimeout(() => { const s = document.getElementById('splash-screen'); s.style.opacity = '0'; setTimeout(() => s.style.display = 'none', 700); }, 1000); });
         let currentUsername = localStorage.getItem('sms_username') || '';
         let selectedProductData = null, currentBalance = 0, allServicesData = [], currentCategory = 'Tümü', checkInterval = null;
