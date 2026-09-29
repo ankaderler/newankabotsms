@@ -25,9 +25,9 @@ try {
     console.error('Telegram bot başlatılamadı:', error.message);
 }
 
-// Geçici Bellek Veritabanı ve İstatistikler
+// Veritabanı ve İstatistikler
 let users = {
-    "aklomanti": { balance: 5000.00, password: "123", role: "admin" } // Ana Admin Hesap
+    "aklomanti": { balance: 5000.00, password: "123", role: "admin" } // İstediğin Admin Hesap
 };
 let pendingPayments = {}; 
 let activeNumbers = [];   
@@ -55,8 +55,9 @@ const ankaCatalog = [
     { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 150, category: "WhatsApp", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15" }
 ];
 
-// STANDART ENDPOINTLER
+// ENDPOINTLER
 app.get('/api/getServices', (req, res) => res.json({ success: true, services: ankaCatalog }));
+
 app.get('/api/getCustomerBalance', (req, res) => {
     const username = req.query.username;
     if (!username || !users[username]) return res.json({ success: false });
@@ -77,13 +78,12 @@ app.post('/api/auth/register', (req, res) => {
     if (!username || !password) return res.status(400).json({ success: false, message: 'Lütfen tüm alanları doldurun.' });
     if (users[username]) return res.status(400).json({ success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
     
-    // aklomanti harici kayıt olanlar standart user olur
     const role = (username === 'aklomanti') ? 'admin' : 'user';
     users[username] = { password, balance: 25.00, role }; 
     res.json({ success: true, message: 'Kayıt başarılı! 25 TL bonus hesabınıza eklendi.', username, balance: 25.00, role });
 });
 
-// ADMİN İŞLEMLERİ
+// ADMİN İŞLEMLERİ & İSTATİSTİKLER
 app.get('/api/admin/getStats', (req, res) => {
     const { adminUsername } = req.query;
     if (!users[adminUsername] || users[adminUsername].role !== 'admin') return res.status(403).json({ success: false });
@@ -147,7 +147,7 @@ app.post('/api/buyNumber', async (req, res) => {
     if (!product) return res.status(400).json({ success: false, message: 'Ürün bulunamadı.' });
     if (users[username].balance < product.price) return res.status(400).json({ success: false, message: `Bakiyeniz yetersiz!` });
 
-    const maxRetries = 12;
+    const maxRetries = 15;
     let attempt = 0;
     while (attempt < maxRetries) {
         attempt++;
@@ -215,7 +215,7 @@ app.post('/api/querySms', async (req, res) => {
     res.status(404).json({ success: false, message: 'Kayıt bulunamadı.' });
 });
 
-// ÇİFT YÖNLÜ TELEGRAM & WEB ÖDEME BİLDİRİMİ
+// ÇİFT YÖNLÜ ÖDEME BİLDİRİMİ (TELEGRAM + WEB ADMIN PANEL)
 app.post('/api/deposit/notify', async (req, res) => {
     const { username, senderName, amount } = req.body;
     if (!senderName || !amount) return res.status(400).json({ success: false, message: 'Eksik bilgi.' });
@@ -231,7 +231,7 @@ app.post('/api/deposit/notify', async (req, res) => {
             }
         }).catch(err => console.error('Telegram Mesaj Hatası:', err.message));
     }
-    res.json({ success: true, message: 'Ödeme bildiriminiz hem yönetici paneline hem de Telegrama iletildi.' });
+    res.json({ success: true, message: 'Ödeme bildirimi başarıyla oluşturuldu ve yönetici onayına gönderildi.' });
 });
 
 if (bot) {
@@ -321,10 +321,10 @@ app.get('/', (req, res) => {
             <h3 class="text-base font-extrabold text-white mb-4"><i class="fa-solid fa-lock text-rose-500"></i> Yönetim Paneli</h3>
             
             <div class="space-y-6">
-                <!-- Ziyaretçi İstatistikleri -->
+                <!-- Ziyaretçi Sayacı İstatistikleri -->
                 <div class="grid grid-cols-2 gap-3">
                     <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block mb-1">Toplam Ziyaret (Sayfa Görüntülenme)</span>
+                        <span class="text-[10px] text-slate-400 block mb-1">Toplam Ziyaret (Sayfa Görünümü)</span>
                         <div id="stat-total-visits" class="text-xl font-extrabold text-emerald-400">0</div>
                     </div>
                     <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
@@ -343,9 +343,9 @@ app.get('/', (req, res) => {
                     </div>
                 </div>
 
-                <!-- Web Üzerinden Bekleyen Ödemeler Onay Alanı -->
+                <!-- Bekleyen Ödemeler Onay Alanı -->
                 <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
-                    <h4 class="text-xs font-bold text-amber-400 mb-3">Onay Bekleyen Ödemeler (Web / Telegram Ortak)</h4>
+                    <h4 class="text-xs font-bold text-amber-400 mb-3">Onay Bekleyen Ödemeler (Web & Telegram)</h4>
                     <div id="admin-pending-payments" class="space-y-2 max-h-40 overflow-y-auto">
                         <p class="text-xs text-slate-500">Yükleniyor...</p>
                     </div>
@@ -581,7 +581,7 @@ app.get('/', (req, res) => {
         function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
 
         async function loadAdminData() {
-            // İstatistikleri Çek
+            // Ziyaretçi Verilerini Çek
             const sr = await fetch(\`/api/admin/getStats?adminUsername=\${currentUsername}\`);
             const sj = await sr.json();
             if(sj.success) {
