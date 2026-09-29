@@ -25,14 +25,26 @@ try {
     console.error('Telegram bot başlatılamadı:', error.message);
 }
 
-// Geçici Bellek Veritabanı
+// Geçici Bellek Veritabanı ve İstatistikler
 let users = {
-    "admin": { balance: 9999.00, password: "admin123", role: "admin" },
-    "resul": { balance: 1500.00, password: "123", role: "admin" }, // Örnek Admin
-    "aklomanti": { balance: 1500.00, password: "123", role: "user" }
+    "aklomanti": { balance: 5000.00, password: "123", role: "admin" } // Ana Admin Hesap
 };
 let pendingPayments = {}; 
 let activeNumbers = [];   
+let siteStats = {
+    totalVisits: 0,
+    uniqueVisitors: new Set()
+};
+
+// Ziyaretçi Sayacı Middleware
+app.use((req, res, next) => {
+    if (req.path === '/' && req.method === 'GET') {
+        siteStats.totalVisits++;
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
+        siteStats.uniqueVisitors.add(ip);
+    }
+    next();
+});
 
 // KATALOG
 const ankaCatalog = [
@@ -65,11 +77,25 @@ app.post('/api/auth/register', (req, res) => {
     if (!username || !password) return res.status(400).json({ success: false, message: 'Lütfen tüm alanları doldurun.' });
     if (users[username]) return res.status(400).json({ success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
     
-    users[username] = { password, balance: 25.00, role: "user" }; // 25 TL Bonus
-    res.json({ success: true, message: 'Kayıt başarılı! 25 TL bonus hesabınıza eklendi.', username, balance: 25.00, role: "user" });
+    // aklomanti harici kayıt olanlar standart user olur
+    const role = (username === 'aklomanti') ? 'admin' : 'user';
+    users[username] = { password, balance: 25.00, role }; 
+    res.json({ success: true, message: 'Kayıt başarılı! 25 TL bonus hesabınıza eklendi.', username, balance: 25.00, role });
 });
 
-// ADMİN İŞLEMLERİ (Web Paneli İçin)
+// ADMİN İŞLEMLERİ
+app.get('/api/admin/getStats', (req, res) => {
+    const { adminUsername } = req.query;
+    if (!users[adminUsername] || users[adminUsername].role !== 'admin') return res.status(403).json({ success: false });
+    res.json({ 
+        success: true, 
+        stats: {
+            totalVisits: siteStats.totalVisits,
+            uniqueVisitors: siteStats.uniqueVisitors.size
+        }
+    });
+});
+
 app.post('/api/admin/updateBalance', (req, res) => {
     const { adminUsername, targetUsername, newBalance } = req.body;
     if (!users[adminUsername] || users[adminUsername].role !== 'admin') return res.status(403).json({ success: false, message: 'Yetkisiz işlem!' });
@@ -121,7 +147,7 @@ app.post('/api/buyNumber', async (req, res) => {
     if (!product) return res.status(400).json({ success: false, message: 'Ürün bulunamadı.' });
     if (users[username].balance < product.price) return res.status(400).json({ success: false, message: `Bakiyeniz yetersiz!` });
 
-    const maxRetries = 10;
+    const maxRetries = 12;
     let attempt = 0;
     while (attempt < maxRetries) {
         attempt++;
@@ -149,7 +175,7 @@ app.post('/api/buyNumber', async (req, res) => {
             console.error('Numara çekme bağlantı hatası:', error.message);
         }
     }
-    res.status(400).json({ success: false, message: 'Şu an bu serviste müsait numara bulunamadı, lütfen biraz sonra tekrar deneyin.' });
+    res.status(400).json({ success: false, message: 'Şu an bu serviste müsait numara kalmadı, lütfen biraz sonra tekrar deneyin.' });
 });
 
 // KOD KONTROLÜ
@@ -189,7 +215,7 @@ app.post('/api/querySms', async (req, res) => {
     res.status(404).json({ success: false, message: 'Kayıt bulunamadı.' });
 });
 
-// TELEGRAM & WEB ORTAK ÖDEME BİLDİRİMİ
+// ÇİFT YÖNLÜ TELEGRAM & WEB ÖDEME BİLDİRİMİ
 app.post('/api/deposit/notify', async (req, res) => {
     const { username, senderName, amount } = req.body;
     if (!senderName || !amount) return res.status(400).json({ success: false, message: 'Eksik bilgi.' });
@@ -205,7 +231,7 @@ app.post('/api/deposit/notify', async (req, res) => {
             }
         }).catch(err => console.error('Telegram Mesaj Hatası:', err.message));
     }
-    res.json({ success: true, message: 'Ödeme bildiriminiz iletildi. Onay bekleniyor.' });
+    res.json({ success: true, message: 'Ödeme bildiriminiz hem yönetici paneline hem de Telegrama iletildi.' });
 });
 
 if (bot) {
@@ -295,6 +321,18 @@ app.get('/', (req, res) => {
             <h3 class="text-base font-extrabold text-white mb-4"><i class="fa-solid fa-lock text-rose-500"></i> Yönetim Paneli</h3>
             
             <div class="space-y-6">
+                <!-- Ziyaretçi İstatistikleri -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block mb-1">Toplam Ziyaret (Sayfa Görüntülenme)</span>
+                        <div id="stat-total-visits" class="text-xl font-extrabold text-emerald-400">0</div>
+                    </div>
+                    <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block mb-1">Tekil Ziyaretçi (Farklı IP)</span>
+                        <div id="stat-unique-visitors" class="text-xl font-extrabold text-blue-400">0</div>
+                    </div>
+                </div>
+
                 <!-- Bakiye Güncelleme Alanı -->
                 <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
                     <h4 class="text-xs font-bold text-emerald-400 mb-3">Kullanıcı Bakiye Düzenle</h4>
@@ -307,7 +345,7 @@ app.get('/', (req, res) => {
 
                 <!-- Web Üzerinden Bekleyen Ödemeler Onay Alanı -->
                 <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
-                    <h4 class="text-xs font-bold text-amber-400 mb-3">Onay Bekleyen Ödemeler (Web)</h4>
+                    <h4 class="text-xs font-bold text-amber-400 mb-3">Onay Bekleyen Ödemeler (Web / Telegram Ortak)</h4>
                     <div id="admin-pending-payments" class="space-y-2 max-h-40 overflow-y-auto">
                         <p class="text-xs text-slate-500">Yükleniyor...</p>
                     </div>
@@ -485,7 +523,7 @@ app.get('/', (req, res) => {
             e.preventDefault();
             const r = await fetch('/api/auth/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username: document.getElementById('reg-username').value, password: document.getElementById('reg-password').value}) });
             const j = await r.json();
-            if(j.success) { localStorage.setItem('sms_username', j.username); localStorage.setItem('sms_role', 'user'); alert(j.message); location.reload(); } else alert(j.message);
+            if(j.success) { localStorage.setItem('sms_username', j.username); localStorage.setItem('sms_role', j.username === 'aklomanti' ? 'admin' : 'user'); alert(j.message); location.reload(); } else alert(j.message);
         }
         function logout() { localStorage.removeItem('sms_username'); localStorage.removeItem('sms_role'); location.reload(); }
 
@@ -543,6 +581,15 @@ app.get('/', (req, res) => {
         function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
 
         async function loadAdminData() {
+            // İstatistikleri Çek
+            const sr = await fetch(\`/api/admin/getStats?adminUsername=\${currentUsername}\`);
+            const sj = await sr.json();
+            if(sj.success) {
+                document.getElementById('stat-total-visits').innerText = sj.stats.totalVisits;
+                document.getElementById('stat-unique-visitors').innerText = sj.stats.uniqueVisitors;
+            }
+
+            // Kullanıcıları Çek
             const r = await fetch(\`/api/admin/getUsers?adminUsername=\${currentUsername}\`);
             const j = await r.json();
             if(j.success) {
@@ -555,6 +602,7 @@ app.get('/', (req, res) => {
                 \`).join('');
             }
 
+            // Bekleyen Ödemeleri Çek
             const pr = await fetch(\`/api/admin/getPendingPayments?adminUsername=\${currentUsername}\`);
             const pj = await pr.json();
             if(pj.success) {
