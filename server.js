@@ -9,42 +9,71 @@ app.use(express.urlencoded({ extended: true }));
 const API_KEY = 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
 const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
 
-app.get('/api/getBalance', async (req, res) => {
-    try {
-        const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getBalance`);
-        let rawData = response.data; // Örn: ACCESS_BALANCE:6.85
-        let balance = rawData;
-        if (typeof rawData === 'string' && rawData.includes(':')) {
-            balance = rawData.split(':')[1];
-        }
-        res.json({ success: true, data: balance });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Bakiye alınamadı.', error: error.message });
-    }
+// Basit veritabanı simülasyonu (Gerçek projede MongoDB veya MySQL kullanılmalıdır)
+let users = {
+    "musteri@gmail.com": { balance: 250.00, name: "Örnek Müşteri" } // Müşterinin kendi paneli bakiyesi
+};
+
+// Servis fiyatları (Müşterinin bakiyesinden düşülecek rakamlar)
+const servicePrices = {
+    "wa": 200,
+    "tg": 200,
+    "lg": 80
+};
+
+// 1. Müşteri Bakiye Sorgulama Endpoint'i
+app.get('/api/getCustomerBalance', (req, res) => {
+    // Şimdilik test için sabit bir müşteri email'i baz alıyoruz
+    const email = req.query.email || "musteri@gmail.com";
+    const user = users[email] || { balance: 0 };
+    res.json({ success: true, balance: user.balance });
 });
 
-app.post('/api/getNumber', async (req, res) => {
-    const { service, country } = req.body;
+// 2. Numara Satın Alma (Müşteri bakiyesinden düşer, OnaylaSMS'ten numarayı çeker)
+app.post('/api/buyNumber', async (req, res) => {
+    const { service, country, email } = req.body;
+    const userEmail = email || "musteri@gmail.com";
+    
+    if (!users[userEmail]) {
+        return res.status(400).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+    }
+
+    const price = servicePrices[service] || 100;
+
+    // Müşterinin yeterli bakiyesi var mı kontrol et
+    if (users[userEmail].balance < price) {
+        return res.status(400).json({ 
+            success: false, 
+            message: `Bakiyeniz yetersiz! Bu ürün ${price} TL, sizin bakiyeniz ${users[userEmail].balance} TL. Lütfen bakiye yükleyin.` 
+        });
+    }
+
     try {
+        // Onayla SMS API üzerinden senin ana bakiyenle numarayı satın al
         const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getNumber&service=${service}&country=${country || 0}`);
         const resultText = response.data;
 
         if (resultText.startsWith('ACCESS_NUMBER')) {
+            // Numara başarıyla alındı, müşterinin bakiyesinden düşelim
+            users[userEmail].balance -= price;
+
             const parts = resultText.split(':');
             return res.json({
                 success: true,
                 activationId: parts[1],
                 phoneNumber: parts[2],
+                remainingBalance: users[userEmail].balance,
                 message: 'Numara başarıyla alındı!'
             });
         } else {
-            return res.status(400).json({ success: false, message: `Numara alınamadı: ${resultText}` });
+            return res.status(400).json({ success: false, message: `Sistem hatası (Tedarikçi): ${resultText}` });
         }
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Sunucu hatası.', error: error.message });
+        res.status(500).json({ success: false, message: 'Sunucu bağlantı hatası.', error: error.message });
     }
 });
 
+// 3. SMS Kodunu Kontrol Etme Endpoint'i
 app.get('/api/checkSms/:activationId', async (req, res) => {
     const { activationId } = req.params;
     try {
@@ -63,13 +92,14 @@ app.get('/api/checkSms/:activationId', async (req, res) => {
     }
 });
 
+// Ana Arayüz (Frontend)
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AnkaSMS - Otomatik Onay Paneli</title>
+    <title>AnkaSMS - Müşteri Paneli</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -86,14 +116,14 @@ app.get('/', (req, res) => {
             </div>
             <div>
                 <span class="font-bold text-lg tracking-tight text-white">AnkaSMS</span>
-                <span class="block text-[10px] text-blue-400 font-medium">OTOMATİK API PANELİ</span>
+                <span class="block text-[10px] text-blue-400 font-medium">MÜŞTERİ PANELİ</span>
             </div>
         </div>
         <div class="flex items-center space-x-3">
             <div class="glass px-3 py-1.5 rounded-xl flex items-center space-x-2 text-sm border-blue-500/20">
-                <i class="fa-solid fa-wallet text-blue-400"></i>
-                <span class="text-slate-400">Bakiye:</span>
-                <span id="system-balance" class="font-bold text-emerald-400">Yükleniyor...</span>
+                <i class="fa-solid fa-wallet text-emerald-400"></i>
+                <span class="text-slate-400">Bakiyeniz:</span>
+                <span id="customer-balance" class="font-bold text-emerald-400">Yükleniyor...</span>
             </div>
             <button onclick="openDepositModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-blue-600/20">
                 <i class="fa-solid fa-plus mr-1"></i> Bakiye Yükle
@@ -105,15 +135,15 @@ app.get('/', (req, res) => {
         <div class="glass p-6 rounded-2xl mb-8 border border-blue-500/30">
             <h2 class="text-xl font-bold text-white mb-4 flex items-center space-x-2">
                 <i class="fa-solid fa-cart-shopping text-blue-500"></i>
-                <span>Hızlı Numara Satın Al (OnaylaSMS Entegrasyonlu)</span>
+                <span>Hızlı Numara Satın Al</span>
             </h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">Servis Seçin</label>
                     <select id="service-select" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2.5 text-xs text-white">
-                        <option value="wa">WhatsApp (200 TL)</option>
-                        <option value="tg">Telegram (200 TL)</option>
-                        <option value="lg">Letgo TR SMS (80 TL)</option>
+                        <option value="wa">WhatsApp - 200 TL</option>
+                        <option value="tg">Telegram - 200 TL</option>
+                        <option value="lg">Letgo TR SMS - 80 TL</option>
                     </select>
                 </div>
                 <div>
@@ -138,12 +168,12 @@ app.get('/', (req, res) => {
         </div>
     </main>
 
-    <!-- Bakiye Yükleme Modalı -->
+    <!-- Bakiye Yükleme Modalı (Arda Sakla Adına Ödeme) -->
     <div id="deposit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="glass w-full max-w-md rounded-2xl p-6 border border-blue-500/30 relative">
             <button onclick="closeDepositModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             <h3 class="text-lg font-bold text-white mb-2"><i class="fa-solid fa-wallet text-blue-500"></i> Bakiye Yükleme Bilgileri</h3>
-            <p class="text-xs text-slate-400 mb-4">Ödemeyi yapacağınız hesap bilgileri aşağıdadır:</p>
+            <p class="text-xs text-slate-400 mb-4">Aşağıdaki hesaba ödeme yaptıktan sonra bildirim gönderin:</p>
             
             <div class="bg-slate-900/90 p-4 rounded-xl border border-blue-500/30 mb-4 space-y-2 text-xs">
                 <div class="flex justify-between"><span class="text-slate-400">Alıcı Ad Soyad:</span> <span class="font-bold text-emerald-400 text-sm">Arda Sakla</span></div>
@@ -162,10 +192,10 @@ app.get('/', (req, res) => {
     <script>
         async function fetchBalance() {
             try {
-                const res = await fetch('/api/getBalance');
+                const res = await fetch('/api/getCustomerBalance');
                 const json = await res.json();
                 if(json.success) {
-                    document.getElementById('system-balance').innerText = json.data + ' TL';
+                    document.getElementById('customer-balance').innerText = json.balance.toFixed(2) + ' TL';
                 }
             } catch(e) { console.error(e); }
         }
@@ -180,10 +210,10 @@ app.get('/', (req, res) => {
             alert('Numara talep ediliyor, lütfen bekleyin...');
             
             try {
-                const res = await fetch('/api/getNumber', {
+                const res = await fetch('/api/buyNumber', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ service, country })
+                    body: JSON.stringify({ service, country, email: 'musteri@gmail.com' })
                 });
                 const json = await res.json();
 
@@ -191,6 +221,9 @@ app.get('/', (req, res) => {
                     document.getElementById('result-box').classList.remove('hidden');
                     document.getElementById('res-phone').innerText = json.phoneNumber;
                     document.getElementById('res-id').innerText = json.activationId;
+                    
+                    // Bakiyeyi güncelle
+                    document.getElementById('customer-balance').innerText = json.remainingBalance.toFixed(2) + ' TL';
 
                     if(checkInterval) clearInterval(checkInterval);
                     checkInterval = setInterval(() => checkSmsCode(json.activationId), 3000);
@@ -221,7 +254,7 @@ app.get('/', (req, res) => {
             const name = document.getElementById('dep-name').value;
             const amount = document.getElementById('dep-amount').value;
             if(!name || !amount) { alert('Lütfen alanları doldurun.'); return; }
-            alert('Ödeme bildiriminiz Arda Sakla adına alınmıştır. Kontrol ediliyor.');
+            alert('Ödeme bildiriminiz Arda Sakla adına alınmıştır. Admin onayından sonra bakiyeniz eklenecektir.');
             closeDepositModal();
         }
     </script>
