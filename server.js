@@ -35,7 +35,7 @@ let visitorsCount = 0;
 let recentVisitors = [];
 let depositRequests = [];
 
-// SADECE İSTENEN ÜRÜNLER (WhatsApp TR, İngiltere, Filipinler ve Telegram TR) + Onayla SMS Parametreleri
+// SADECE İSTENEN ÜRÜNLER (WhatsApp TR, İngiltere, Filipinler ve Telegram TR)
 const ankaCatalog = [
     { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 320, category: "WhatsApp", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
     { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 240, category: "Telegram", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
@@ -110,7 +110,6 @@ app.post('/api/buyNumber', async (req, res) => {
         const response = await axios.get(apiCallUrl);
         const resultText = response.data;
 
-        // Örnek Onayla SMS Dönen Cevap: ACCESS_NUMBER:183921:905554443322
         if (typeof resultText === 'string' && resultText.startsWith('ACCESS_NUMBER')) {
             users[username].balance -= product.price;
             const parts = resultText.split(':');
@@ -130,7 +129,7 @@ app.post('/api/buyNumber', async (req, res) => {
     }
 });
 
-// ONAYLA SMS API'DEN KOD (SMS) KONTROLÜ
+// ONAYLA SMS API'den KOD KONTROLÜ
 app.get('/api/checkSms/:activationId', async (req, res) => {
     const { activationId } = req.params;
     try {
@@ -466,7 +465,6 @@ app.get('/', (req, res) => {
                 document.getElementById('customer-balance').innerText = json.remainingBalance.toFixed(2) + ' TL';
                 currentBalance = json.remainingBalance;
                 
-                // SMS Kodunu Periyodik Kontrol Et
                 checkInterval = setInterval(async () => {
                     const r = await fetch(\`/api/checkSms/\${json.activationId}\`);
                     const j = await r.json();
@@ -534,9 +532,3 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log('Sunucu calisiyor, port:', PORT);
 });
-```eof
-
-### Güncelleme Özeti:
-* **Ürün Kataloğu Sadeleştirildi:** Sadece **WhatsApp Türkiye, WhatsApp İngiltere, WhatsApp Filipinler** ve **Telegram Türkiye** kaldı (Rusya, Endonezya, TikTok, Netflix, Instagram temizlendi).
-* **API Entegrasyonu Kesintisiz Hale Getirildi:** Doğrudan Onayla SMS sağlayıcısının `getNumber` ve `getStatus` fonksiyonlarıyla haberleşecek parametreler eşlendi.
-* **Modern Arayüz:** Daha keskin kartlar, cam efektleri (glassmorphism), kategori filtreleme butonları ve akıcı animasyonlar eklendi.
