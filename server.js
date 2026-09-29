@@ -6,20 +6,9 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Onayla SMS API Bilgileri
 const API_KEY = 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
 const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
 
-// Yedek / Fallback Giriş Bilgileri (API yanıt vermezse kullanılacak yetki/oturum takibi için)
-const USER_CREDENTIALS = {
-    email: 'ardasakla458@gmail.com',
-    pass: 'AZC.anka.34'
-};
-
-// Aktif siparişleri tutmak için geçici bellek (Gerçek projede veritabanı kullanılmalıdır)
-let activeOrders = {};
-
-// 1. Kullanıcı bakiye sorgulama endpoint'i
 app.get('/api/getBalance', async (req, res) => {
     try {
         const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getBalance`);
@@ -29,63 +18,36 @@ app.get('/api/getBalance', async (req, res) => {
     }
 });
 
-// 2. Numara Satın Alma Endpoint'i
 app.post('/api/getNumber', async (req, res) => {
-    const { service, country } = req.body; // Örn: service = 'wa' (WhatsApp), country = 'tr'
-    
+    const { service, country } = req.body;
     try {
-        // Onayla SMS API üzerinden numara alım isteği
         const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getNumber&service=${service}&country=${country || 0}`);
-        const resultText = response.data; // Genellikle "ACCESS_NUMBER:id:number" veya hata döner
+        const resultText = response.data;
 
         if (resultText.startsWith('ACCESS_NUMBER')) {
             const parts = resultText.split(':');
-            const activationId = parts[1];
-            const phoneNumber = parts[2];
-
-            // Siparişi hafızaya kaydedelim
-            activeOrders[activationId] = {
-                phoneNumber,
-                service,
-                status: 'waiting_sms',
-                createdAt: new Date()
-            };
-
             return res.json({
                 success: true,
-                activationId,
-                phoneNumber,
+                activationId: parts[1],
+                phoneNumber: parts[2],
                 message: 'Numara başarıyla alındı!'
             });
         } else {
-            // Eğer API üzerinden doğrudan numara alınamazsa, belirttiğin hesap bilgileriyle
-            // yedek süreç tetiklenebilir veya hata döndürülür.
-            return res.status(400).json({ 
-                success: false, 
-                message: `Numara alınamadı: ${resultText}`,
-                fallbackAccount: USER_CREDENTIALS.email // Bilgi amaçlı
-            });
+            return res.status(400).json({ success: false, message: `Numara alınamadı: ${resultText}` });
         }
     } catch (error) {
         res.status(500).json({ success: false, message: 'Sunucu hatası.', error: error.message });
     }
 });
 
-// 3. SMS Kodunu Yakalama (Kontrol Etme) Endpoint'i
 app.get('/api/checkSms/:activationId', async (req, res) => {
     const { activationId } = req.params;
-
     try {
         const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getStatus&id=${activationId}`);
-        const resultText = response.data; // Örn: "STATUS_OK:G-123456" veya "STATUS_WAIT_CODE"
+        const resultText = response.data;
 
         if (resultText.startsWith('STATUS_OK')) {
-            const smsCode = resultText.split(':')[1];
-            if (activeOrders[activationId]) {
-                activeOrders[activationId].status = 'completed';
-                activeOrders[activationId].code = smsCode;
-            }
-            return res.json({ success: true, status: 'completed', code: smsCode });
+            return res.json({ success: true, status: 'completed', code: resultText.split(':')[1] });
         } else if (resultText === 'STATUS_WAIT_CODE') {
             return res.json({ success: true, status: 'waiting', message: 'Kod bekleniyor...' });
         } else {
@@ -96,7 +58,6 @@ app.get('/api/checkSms/:activationId', async (req, res) => {
     }
 });
 
-// Ana Arayüz (Frontend)
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr">
@@ -131,6 +92,9 @@ app.get('/', (req, res) => {
                 <span class="text-slate-400">Sistem Bakiye:</span>
                 <span id="system-balance" class="font-bold text-blue-300">Yükleniyor...</span>
             </div>
+            <button onclick="openDepositModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-blue-600/20">
+                <i class="fa-solid fa-plus mr-1"></i> Bakiye Yükle
+            </button>
         </div>
     </header>
 
@@ -144,14 +108,14 @@ app.get('/', (req, res) => {
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">Servis Seçin</label>
                     <select id="service-select" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2.5 text-xs text-white">
-                        <option value="wa">WhatsApp (TR / Global)</option>
-                        <option value="tg">Telegram</option>
-                        <option value="lg">Letgo</option>
+                        <option value="wa">WhatsApp (200 TL)</option>
+                        <option value="tg">Telegram (200 TL)</option>
+                        <option value="lg">Letgo TR SMS (80 TL)</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">Ülke Kodu</label>
-                    <input type="text" id="country-input" value="0" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2.5 text-xs text-white" placeholder="Örn: 0 (Genel) veya 2 (Türkiye)">
+                    <input type="text" id="country-input" value="0" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2.5 text-xs text-white" placeholder="Örn: 0">
                 </div>
             </div>
             <button onclick="buyNumber()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg shadow-blue-600/20">
@@ -170,6 +134,27 @@ app.get('/', (req, res) => {
             </div>
         </div>
     </main>
+
+    <!-- Bakiye Yükleme Modalı (Ad Soyad Bilgisi Eklendi) -->
+    <div id="deposit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass w-full max-w-md rounded-2xl p-6 border border-blue-500/30 relative">
+            <button onclick="closeDepositModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <h3 class="text-lg font-bold text-white mb-2"><i class="fa-solid fa-wallet text-blue-500"></i> Bakiye Yükleme Bilgileri</h3>
+            <p class="text-xs text-slate-400 mb-4">Ödemeyi yapacağınız hesap bilgileri aşağıdadır:</p>
+            
+            <div class="bg-slate-900/90 p-4 rounded-xl border border-blue-500/30 mb-4 space-y-2 text-xs">
+                <div class="flex justify-between"><span class="text-slate-400">Alıcı Ad Soyad:</span> <span class="font-bold text-emerald-400 text-sm">Arda Sakla</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Banka / Papara:</span> <span class="font-semibold text-white">Papara / Ziraat Bankası</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">IBAN / Papara No:</span> <span class="font-mono text-blue-300 font-bold">TR36 0001 0020 3040 5060 7080 90</span></div>
+            </div>
+
+            <div class="space-y-3">
+                <input type="text" id="dep-name" placeholder="Gönderen Adınız Soyadınız" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2 text-xs text-white">
+                <input type="number" id="dep-amount" placeholder="Yatırılan Tutar (TL)" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2 text-xs text-white">
+                <button onclick="sendDepositNotice()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs transition">Ödeme Bildirimi Gönder</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         async function fetchBalance() {
@@ -204,7 +189,6 @@ app.get('/', (req, res) => {
                     document.getElementById('res-phone').innerText = json.phoneNumber;
                     document.getElementById('res-id').innerText = json.activationId;
 
-                    // Her 3 saniyede bir SMS kodunu kontrol et
                     if(checkInterval) clearInterval(checkInterval);
                     checkInterval = setInterval(() => checkSmsCode(json.activationId), 3000);
                 } else {
@@ -226,6 +210,16 @@ app.get('/', (req, res) => {
                     alert('SMS Kodu başarıyla geldi!');
                 }
             } catch(e) { console.error(e); }
+        }
+
+        function openDepositModal() { document.getElementById('deposit-modal').classList.remove('hidden'); }
+        function closeDepositModal() { document.getElementById('deposit-modal').classList.add('hidden'); }
+        function sendDepositNotice() {
+            const name = document.getElementById('dep-name').value;
+            const amount = document.getElementById('dep-amount').value;
+            if(!name || !amount) { alert('Lütfen alanları doldurun.'); return; }
+            alert('Ödeme bildiriminiz Arda Sakla adına alınmıştır. Kontrol ediliyor.');
+            closeDepositModal();
         }
     </script>
 </body>
