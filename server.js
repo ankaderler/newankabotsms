@@ -35,7 +35,7 @@ let visitorsCount = 0;
 let recentVisitors = [];
 let depositRequests = [];
 
-// YENİ FİYATLANDIRMA VE KATEGORİLER
+// ÜRÜN KATALOĞU VE İSTEDİĞİN FİYATLAR
 const ankaCatalog = [
     { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, category: "WhatsApp", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
     { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 220, category: "Telegram", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
@@ -129,7 +129,7 @@ app.post('/api/buyNumber', async (req, res) => {
     }
 });
 
-// ONAYLA SMS API'den KOD KONTROLÜ
+// KOD KONTROLÜ
 app.get('/api/checkSms/:activationId', async (req, res) => {
     const { activationId } = req.params;
     try {
@@ -220,7 +220,7 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANKA SMS - Profesyonel Onay Paneli</title>
+    <title>ANKA SİYAHSMS HİZMETLERİ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -243,8 +243,8 @@ app.get('/', (req, res) => {
     <div id="splash-screen">
         <div class="absolute w-96 h-96 bg-blue-600/20 rounded-full blur-3xl neon-bg-1"></div>
         <div class="splash-logo-box mb-5 relative z-10"><i class="fa-solid fa-feather text-white text-3xl"></i></div>
-        <h1 class="text-xl sm:text-2xl font-extrabold tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent relative z-10">ANKA SMS</h1>
-        <p class="text-[11px] text-slate-400 mt-2 tracking-widest uppercase relative z-10">Canlı Altyapı Hazırlanıyor...</p>
+        <h1 class="text-xl sm:text-2xl font-extrabold tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent relative z-10">ANKA SİYAHSMS</h1>
+        <p class="text-[11px] text-slate-400 mt-2 tracking-widest uppercase relative z-10">Altyapı Yükleniyor...</p>
     </div>
 
     <header class="glass sticky top-0 z-40 border-b border-blue-900/20 px-6 py-4 flex items-center justify-between">
@@ -253,7 +253,7 @@ app.get('/', (req, res) => {
                 <i class="fa-solid fa-feather text-white text-lg"></i>
             </div>
             <div>
-                <span class="font-extrabold text-base tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">ANKA SMS</span>
+                <span class="font-extrabold text-base tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">ANKA SİYAHSMS</span>
                 <span class="block text-[9px] text-blue-400 font-extrabold tracking-widest">ONAY SİSTEMİ</span>
             </div>
         </div>
@@ -283,7 +283,7 @@ app.get('/', (req, res) => {
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Anında Sanal Numara Al</h1>
                 <span class="text-lg sm:text-2xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 drop-shadow-md">ANKA SİYAHSMS HİZMETLERİ</span>
             </div>
-            <p class="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">WhatsApp ve Telegram servisleriniz için Onayla SMS altyapısıyla anlık havuzdan numara çekin, kodunuzu saniyeler içinde ekranda görün.</p>
+            <p class="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">WhatsApp ve Telegram servisleriniz için anlık havuzdan numara çekin, kodunuzu saniyeler içinde ekranda görün.</p>
         </div>
 
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
@@ -396,7 +396,7 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
-    <footer class="glass border-t border-blue-900/20 text-center py-6 text-[11px] text-slate-500">&copy; 2026 ANKA SMS HİZMETLERİ - Tüm Hakları Saklıdır.</footer>
+    <footer class="glass border-t border-blue-900/20 text-center py-6 text-[11px] text-slate-500">&copy; 2026 ANKA SİYAHSMS HİZMETLERİ - Tüm Hakları Saklıdır.</footer>
 
     <script>
         window.addEventListener('load', () => { setTimeout(() => { const s = document.getElementById('splash-screen'); s.style.opacity = '0'; setTimeout(() => s.style.display = 'none', 700); }, 1000); });
@@ -420,6 +420,10 @@ app.get('/', (req, res) => {
 
         function renderServices(services) {
             const grid = document.getElementById('services-grid');
+            if(services.length === 0) {
+                grid.innerHTML = \`<div class="col-span-full text-center py-12 text-slate-500 text-xs">Aradığınız kriterlere uygun servis bulunamadı.</div>\`;
+                return;
+            }
             grid.innerHTML = services.map(s => \`
                 <div class="glass-card p-6 rounded-3xl flex flex-col justify-between \${s.border}">
                     <div>
