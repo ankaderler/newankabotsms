@@ -1,490 +1,538 @@
-<!DOCTYPE html>
-<html lang="tr">
+const express = require('express');
+const axios = require('axios');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const API_KEY = process.env.API_KEY || 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
+const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
+
+// Telegram Bot Bilgilerin
+const TELEGRAM_BOT_TOKEN = '8874989367:AAFLCBRvCV5UIP9JOQwpvY9ZzDLVSIKYIhM';
+const TELEGRAM_CHAT_ID = '8964930489';
+
+async function sendTelegramNotification(message) {
+    try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        await axios.post(url, {
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message,
+            parse_mode: 'HTML'
+        });
+    } catch (error) {
+        console.error('Telegram bildirim hatası:', error.message);
+    }
+}
+
+// Veritabanı ve Bellek Yapıları
+let users = {
+    "aklomanti": { balance: 1500.00, password: "123" }
+};
+
+let visitorsCount = 0;
+let recentVisitors = [];
+let depositRequests = [];
+
+// ANKA SMS HİZMETLERİ - Güncel Servis ve Ülke Kataloğu
+const ankaCatalog = [
+    // Türkiye
+    { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 320, category: "Popüler", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
+    { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 240, category: "Popüler", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
+    { id: "ig_tr", service: "ig", country: "1", name: "Instagram Türkiye", price: 270, category: "Sosyal Medya", icon: "fa-instagram", color: "text-pink-400", bg: "bg-pink-500/15", border: "border-pink-500/40" },
+    { id: "fb_tr", service: "fb", country: "1", name: "Facebook Türkiye", price: 190, category: "Sosyal Medya", icon: "fa-facebook", color: "text-blue-500", bg: "bg-blue-600/15", border: "border-blue-600/40" },
+    { id: "tw_tr", service: "tw", country: "1", name: "Twitter / X Türkiye", price: 210, category: "Sosyal Medya", icon: "fa-twitter", color: "text-sky-400", bg: "bg-sky-500/15", border: "border-sky-500/40" },
+    { id: "go_tr", service: "go", country: "1", name: "Google / Gmail Türkiye", price: 160, category: "Genel", icon: "fa-google", color: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40" },
+    { id: "nf_tr", service: "nf", country: "1", name: "Netflix Türkiye", price: 290, category: "Eğlence", icon: "fa-film", color: "text-red-500", bg: "bg-red-600/15", border: "border-red-600/40" },
+    { id: "tk_tr", service: "tk", country: "1", name: "TikTok Türkiye", price: 220, category: "Sosyal Medya", icon: "fa-tiktok", color: "text-white", bg: "bg-slate-700/50", border: "border-slate-600" },
+
+    // İngiltere
+    { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 170, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
+    { id: "tg_uk", service: "tg", country: "2", name: "Telegram İngiltere", price: 180, category: "Yurtdışı", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
+
+    // Filipinler & Endonezya
+    { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 130, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" },
+    { id: "wa_id", service: "wa", country: "6", name: "WhatsApp Endonezya", price: 100, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
+    { id: "tg_ru", service: "tg", country: "0", name: "Telegram Rusya", price: 110, category: "Yurtdışı", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" }
+];
+
+app.use((req, res, next) => {
+    if (req.path === '/' && req.method === 'GET') {
+        visitorsCount++;
+        recentVisitors.push({ ip: req.ip || '127.0.0.1', time: new Date().toLocaleTimeString('tr-TR') });
+        if(recentVisitors.length > 20) recentVisitors.shift();
+    }
+    next();
+});
+
+app.get('/api/getServices', (req, res) => {
+    res.json({ success: true, services: ankaCatalog });
+});
+
+app.get('/api/getCustomerBalance', (req, res) => {
+    const username = req.query.username || "misafir";
+    if (!users[username]) {
+        return res.json({ success: true, balance: 0.00, name: username });
+    }
+    res.json({ success: true, balance: users[username].balance, name: username });
+});
+
+app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    if (users[username] && users[username].password === password) {
+        res.json({ success: true, message: 'Giriş başarılı!', username, balance: users[username].balance });
+    } else {
+        res.status(400).json({ success: false, message: 'Kullanıcı adı veya şifre hatalı!' });
+    }
+});
+
+app.post('/api/auth/register', (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Lütfen tüm alanları doldurun.' });
+    }
+    if (users[username]) {
+        return res.status(400).json({ success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
+    }
+    users[username] = { password, balance: 25.00 };
+    res.json({ success: true, message: 'Kayıt başarılı! 25 TL bonus hesabınıza eklendi.', username, balance: 25.00 });
+});
+
+app.post('/api/buyNumber', async (req, res) => {
+    const { productKey, username } = req.body;
+    
+    if (!users[username]) {
+        return res.status(400).json({ success: false, message: 'Oturum bulunamadı. Lütfen giriş yapın.' });
+    }
+
+    const product = ankaCatalog.find(s => s.id === productKey);
+    if (!product) {
+        return res.status(400).json({ success: false, message: 'Ürün bulunamadı.' });
+    }
+
+    if (users[username].balance < product.price) {
+        return res.status(400).json({ 
+            success: false, 
+            message: `Bakiyeniz yetersiz! Bu ürün ${product.price} TL, sizin bakiyeniz ${users[username].balance.toFixed(2)} TL.` 
+        });
+    }
+
+    try {
+        const apiCallUrl = `${API_URL}?api_key=${API_KEY}&action=getNumber&service=${product.service}&country=${product.country}`;
+        const response = await axios.get(apiCallUrl);
+        const resultText = response.data;
+
+        if (resultText.startsWith('ACCESS_NUMBER')) {
+            users[username].balance -= product.price;
+            const parts = resultText.split(':');
+            return res.json({
+                success: true,
+                activationId: parts[1],
+                phoneNumber: parts[2],
+                remainingBalance: users[username].balance,
+                productName: product.name,
+                message: 'Numara başarıyla alındı!'
+            });
+        } else {
+            return res.status(400).json({ success: false, message: `Sistem Tedarikçi Hatası: ${resultText}` });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Sunucu bağlantı hatası.', error: error.message });
+    }
+});
+
+app.get('/api/checkSms/:activationId', async (req, res) => {
+    const { activationId } = req.params;
+    try {
+        const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getStatus&id=${activationId}`);
+        const resultText = response.data;
+
+        if (resultText.startsWith('STATUS_OK')) {
+            return res.json({ success: true, status: 'completed', code: resultText.split(':')[1] });
+        } else if (resultText === 'STATUS_WAIT_CODE') {
+            return res.json({ success: true, status: 'waiting', message: 'Kod bekleniyor...' });
+        } else {
+            return res.json({ success: true, status: resultText, message: resultText });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'SMS kontrol edilemedi.', error: error.message });
+    }
+});
+
+app.post('/api/deposit/notify', async (req, res) => {
+    const { username, senderName, amount } = req.body;
+    if (!senderName || !amount) {
+        return res.status(400).json({ success: false, message: 'Bilgiler eksik.' });
+    }
+
+    const newDep = {
+        id: Date.now(),
+        username: username || 'Misafir',
+        senderName,
+        amount: parseFloat(amount),
+        status: 'Bekliyor',
+        time: new Date().toLocaleString('tr-TR')
+    };
+
+    depositRequests.push(newDep);
+
+    const msg = `🔔 <b>ANKA SMS - YENİ ÖDEME BİLDİRİMİ!</b>\n\n` +
+                `👤 <b>Kullanıcı:</b> ${newDep.username}\n` +
+                `💳 <b>Gönderen:</b> ${newDep.senderName}\n` +
+                `💰 <b>Tutar:</b> ${newDep.amount} TL\n` +
+                `⏱ <b>Zaman:</b> ${newDep.time}\n\n` +
+                `👉 Admin panelinden onaylayabilirsiniz!`;
+    
+    await sendTelegramNotification(msg);
+
+    res.json({ success: true, message: 'Ödeme bildiriminiz başarıyla yetkiliye iletildi.' });
+});
+
+app.get('/api/admin/data', (req, res) => {
+    res.json({
+        success: true,
+        visitorsCount,
+        recentVisitors,
+        depositRequests,
+        usersCount: Object.keys(users).length
+    });
+});
+
+app.post('/api/admin/action', (req, res) => {
+    const { password, actionId, decision } = req.body;
+    if (password !== 'aklomanti') {
+        return res.status(403).json({ success: false, message: 'Yetkisiz şifre!' });
+    }
+
+    const reqIndex = depositRequests.findIndex(d => d.id === actionId);
+    if (reqIndex === -1) {
+        return res.status(404).json({ success: false, message: 'Bildirim bulunamadı.' });
+    }
+
+    const dep = depositRequests[reqIndex];
+    if (decision === 'approve') {
+        if (users[dep.username]) {
+            users[dep.username].balance += dep.amount;
+        } else {
+            users[dep.username] = { password: "123", balance: dep.amount };
+        }
+        dep.status = 'Onaylandı';
+    } else {
+        dep.status = 'Reddedildi';
+    }
+
+    res.json({ success: true, message: `İşlem başarıyla güncellendi: ${dep.status}` });
+});
+
+app.get('/', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="tr" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profesyonel SMS Onay Paneli</title>
+    <title>ANKA SMS HİZMETLERİ - Profesyonel SMS Onay Paneli</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f8fafc; overflow-x: hidden; }
+        .glass { background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(24px); border: 1px solid rgba(59, 130, 246, 0.2); }
+        .glass-card { background: rgba(30, 41, 59, 0.55); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.07); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .glass-card:hover { transform: translateY(-6px); border-color: rgba(59, 130, 246, 0.6); box-shadow: 0 20px 40px -15px rgba(59, 130, 246, 0.3); }
+        @keyframes modalAnim { from { opacity: 0; transform: scale(0.85) translateY(30px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .animate-modal { animation: modalAnim 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes neonPulse { 0%, 100% { opacity: 0.3; transform: scale(1); filter: blur(40px); } 50% { opacity: 0.7; transform: scale(1.12); filter: blur(60px); } }
+        .neon-bg-1 { animation: neonPulse 6s ease-in-out infinite; }
+        .neon-bg-2 { animation: neonPulse 8s ease-in-out infinite reverse; }
+        @keyframes floatAnim { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        .support-float { animation: floatAnim 3s ease-in-out infinite; }
+        #splash-screen { position: fixed; inset: 0; z-index: 9999; background: #030712; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.8s ease, visibility 0.8s ease; }
+        .splash-logo-box { width: 90px; height: 90px; background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6); border-radius: 30px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(59, 130, 246, 0.6); animation: pulse 2s infinite; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+    <div id="splash-screen">
+        <div class="absolute w-96 h-96 bg-blue-600/20 rounded-full blur-3xl neon-bg-1"></div>
+        <div class="splash-logo-box mb-6 relative z-10"><i class="fa-solid fa-feather text-white text-4xl"></i></div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent relative z-10">ANKA SMS HİZMETLERİ</h1>
+        <p class="text-xs text-slate-400 mt-2 tracking-widest uppercase relative z-10">Güvenli Altyapı Yükleniyor...</p>
+    </div>
 
-    <!-- Top Navigation Bar -->
-    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="bg-indigo-600 p-2 rounded-lg text-white font-bold text-xl shadow-lg shadow-indigo-500/30">
-                    <i class="fa-solid fa-shield-halved"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg tracking-tight text-white">SMSOnay <span class="text-indigo-400 text-xs px-2 py-0.5 bg-indigo-950 border border-indigo-800 rounded-full">PRO v2.5</span></h1>
-                </div>
+    <header class="glass sticky top-0 z-40 border-b border-blue-900/30 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="location.reload()">
+            <div class="w-11 h-11 bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/30">
+                <i class="fa-solid fa-feather text-white text-xl"></i>
             </div>
-            
-            <div class="flex items-center space-x-4">
-                <div class="hidden md:flex items-center space-x-2 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700">
-                    <span class="text-xs text-slate-400">Bakiye:</span>
-                    <span id="headerBalance" class="font-bold text-emerald-400">₺1,450.00</span>
-                    <button onclick="openModal('depositModal')" class="ml-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1 rounded transition">Yükle</button>
-                </div>
-                
-                <div class="relative">
-                    <button onclick="toggleUserMenu()" class="flex items-center space-x-2 focus:outline-none">
-                        <div class="w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center font-semibold text-white shadow">
-                            A
-                        </div>
-                        <span class="hidden sm:inline text-sm font-medium">Admin User</span>
-                        <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
-                    </button>
-                </div>
+            <div>
+                <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">ANKA SMS</span>
+                <span class="block text-[10px] text-blue-400 font-extrabold tracking-widest">CANLI HİZMETLER</span>
             </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <div class="glass px-4 py-2 rounded-2xl flex items-center space-x-2 text-xs border-blue-500/30 shadow-inner">
+                <i class="fa-solid fa-wallet text-emerald-400"></i>
+                <span class="text-slate-400">Bakiye:</span>
+                <span id="customer-balance" class="font-extrabold text-emerald-400 text-sm">0.00 TL</span>
+            </div>
+            <button onclick="openDepositModal()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg shadow-blue-600/30">
+                <i class="fa-solid fa-plus mr-1"></i> Bakiye Yükle
+            </button>
+            <button onclick="openAuthModal()" class="glass hover:bg-slate-800 text-slate-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition border border-slate-700 flex items-center space-x-1.5">
+                <i class="fa-solid fa-user-circle text-blue-400 text-sm"></i>
+                <span id="user-profile-text">Giriş / Kayıt Ol</span>
+            </button>
+            <button onclick="openAdminModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-2.5 rounded-2xl text-xs font-bold transition border border-amber-500/30" title="Admin Paneli">
+                <i class="fa-solid fa-shield-halved"></i>
+            </button>
         </div>
     </header>
 
-    <!-- Main App Wrapper -->
-    <div class="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 gap-6">
-        
-        <!-- Sidebar Navigation -->
-        <aside class="w-full md:w-64 space-y-2">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-1">
-                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition bg-indigo-600 text-white shadow-md shadow-indigo-600/20">
-                    <i class="fa-solid fa-chart-pie w-5"></i>
-                    <span>Genel Bakış</span>
-                </button>
-                <button onclick="switchTab('services')" id="nav-services" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-800 hover:text-white">
-                    <i class="fa-solid fa-globe w-5"></i>
-                    <span>Numara Satın Al</span>
-                </button>
-                <button onclick="switchTab('active')" id="nav-active" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-800 hover:text-white">
-                    <i class="fa-solid fa-clock-rotate-left w-5"></i>
-                    <span>Aktif İşlemler</span>
-                    <span id="activeCountBadge" class="ml-auto bg-indigo-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
-                </button>
-                <button onclick="switchTab('history')" id="nav-history" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-800 hover:text-white">
-                    <i class="fa-solid fa-receipt w-5"></i>
-                    <span>Geçmiş Kodlar</span>
-                </button>
-                <button onclick="switchTab('api')" id="nav-api" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-800 hover:text-white">
-                    <i class="fa-solid fa-code w-5"></i>
-                    <span>API & Entegrasyon</span>
-                </button>
+    <main class="max-w-6xl mx-auto px-4 py-10 w-full flex-grow">
+        <div class="relative overflow-hidden glass p-8 sm:p-10 rounded-3xl mb-10 border border-blue-500/30 bg-gradient-to-r from-blue-950/50 via-slate-900/80 to-indigo-950/50 shadow-2xl">
+            <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none neon-bg-1"></div>
+            <h1 class="text-2xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">ANKA SMS HİZMETLERİ</h1>
+            <p class="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">Dünya genelinde popüler platformlar için anında sanal numara kiralayın, SMS kodunuzu ekranda görün.</p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+            <div class="relative w-full sm:w-96">
+                <i class="fa-solid fa-search absolute left-4 top-3.5 text-slate-400 text-xs"></i>
+                <input type="text" id="search-input" oninput="filterServices()" placeholder="Servis veya ülke ara..." class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
             </div>
-
-            <!-- Quick Stats Card -->
-            <div class="bg-gradient-to-br from-indigo-950/60 to-slate-900 border border-indigo-900/40 rounded-xl p-4 space-y-3">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs text-indigo-300 font-medium">Hızlı Destek</span>
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                </div>
-                <p class="text-xs text-slate-300">7/24 Canlı destek ve API yardımı için ekibimiz hazır.</p>
-                <button onclick="openSupportModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2 rounded-lg transition font-medium">Destek Talebi Aç</button>
+            <div class="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0" id="category-filters">
+                <button onclick="filterCategory('Tümü')" class="cat-btn bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Tümü</button>
+                <button onclick="filterCategory('Popüler')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Popüler</button>
+                <button onclick="filterCategory('Sosyal Medya')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Sosyal Medya</button>
+                <button onclick="filterCategory('Yurtdışı')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Yurtdışı</button>
             </div>
-        </aside>
+        </div>
 
-        <!-- Main Content Area -->
-        <main class="flex-1 space-y-6">
+        <div id="services-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-12"></div>
+    </main>
 
-            <!-- TAB 1: DASHBOARD -->
-            <div id="tab-dashboard" class="space-y-6">
-                <!-- Metrics Grid -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-slate-400">Toplam Harcama</span>
-                            <div class="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg"><i class="fa-solid fa-wallet"></i></div>
-                        </div>
-                        <div class="mt-4 flex items-baseline">
-                            <span class="text-2xl font-bold text-white">₺3,840.50</span>
-                            <span class="ml-2 text-xs text-emerald-400 font-medium">+%12 bu ay</span>
-                        </div>
-                    </div>
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-slate-400">Alınan SMS Sayısı</span>
-                            <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg"><i class="fa-solid fa-envelope-circle-check"></i></div>
-                        </div>
-                        <div class="mt-4 flex items-baseline">
-                            <span class="text-2xl font-bold text-white" id="totalSmsCount">142</span>
-                            <span class="ml-2 text-xs text-emerald-400 font-medium">+8 bugün</span>
-                        </div>
-                    </div>
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-slate-400">Başarı Oranı</span>
-                            <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg"><i class="fa-solid fa-chart-line"></i></div>
-                        </div>
-                        <div class="mt-4 flex items-baseline">
-                            <span class="text-2xl font-bold text-white">%98.4</span>
-                            <span class="ml-2 text-xs text-emerald-400 font-medium">Stabil</span>
-                        </div>
-                    </div>
+    <a href="https://t.me/SMSPATRONUM" target="_blank" class="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-full shadow-2xl flex items-center justify-center text-xl support-float border border-blue-400/40" title="Canlı Destek">
+        <i class="fa-brands fa-telegram"></i>
+    </a>
+
+    <div id="order-modal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
+        <div class="glass w-full max-w-lg rounded-3xl p-8 border border-blue-500/40 relative animate-modal shadow-2xl">
+            <button onclick="closeOrderModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-2xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            <div id="order-step-1">
+                <h3 id="modal-product-title" class="text-xl font-extrabold text-white mb-2">Ürün Adı</h3>
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-blue-500/20 mb-6 space-y-2 text-xs">
+                    <div class="flex justify-between"><span class="text-slate-400">Ürün Fiyatı:</span> <span id="modal-product-price" class="font-extrabold text-emerald-400 text-sm">0 TL</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Bakiyeniz:</span> <span id="modal-user-balance" class="font-extrabold text-white">0 TL</span></div>
                 </div>
-
-                <!-- Chart & Activity Section -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col">
-                        <h2 class="text-sm font-semibold text-white mb-4">Harcama Grafiği (Son 7 Gün)</h2>
-                        <div class="flex-1 relative min-h-[240px]">
-                            <canvas id="spendingChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col">
-                        <h2 class="text-sm font-semibold text-white mb-4">Son Bildirimler</h2>
-                        <div class="space-y-3 flex-1 overflow-y-auto max-h-[260px] text-xs">
-                            <div class="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                                <span class="text-indigo-400 font-medium">Sistem Güncellemesi</span>
-                                <p class="text-slate-300 mt-1">ABD operatör altyapısı yenilendi, başarı oranı artırıldı.</p>
-                                <span class="text-[10px] text-slate-500 mt-2 block">2 saat önce</span>
-                            </div>
-                            <div class="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                                <span class="text-emerald-400 font-medium">Bakiye Eklendi</span>
-                                <p class="text-slate-300 mt-1">Hesabınıza ₺500.00 başarıyla tanımlandı.</p>
-                                <span class="text-[10px] text-slate-500 mt-2 block">1 gün önce</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <button id="confirm-buy-btn" onclick="executeBuy()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition">Numarayı Satın Al ve Kodu Bekle</button>
             </div>
-
-            <!-- TAB 2: SERVICES / BUY NUMBER -->
-            <div id="tab-services" class="hidden space-y-6">
-                <!-- Search & Filters -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row gap-4 justify-between items-center">
-                    <div class="relative w-full sm:w-80">
-                        <i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i>
-                        <input type="text" id="serviceSearch" onkeyup="filterServices()" placeholder="Servis ara (örn: WhatsApp, Telegram)..." class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
-                    </div>
-                    <div class="flex items-center space-x-3 w-full sm:w-auto">
-                        <select id="countryFilter" onchange="filterServices()" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 w-full sm:w-auto">
-                            <option value="all">Tüm Ülkeler</option>
-                            <option value="tr">Türkiye (+90)</option>
-                            <option value="us">Amerika (+1)</option>
-                            <option value="gb">İngiltere (+44)</option>
-                            <option value="de">Almanya (+49)</option>
-                        </select>
-                    </div>
+            <div id="order-step-2" class="hidden space-y-4">
+                <div class="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl text-emerald-400 font-bold text-sm">Numara Başarıyla Alındı!</div>
+                <div class="bg-slate-900 p-4 rounded-2xl">
+                    <span class="text-xs text-slate-400 block mb-1">Numara:</span>
+                    <div id="res-phone" class="text-xl font-extrabold text-white font-mono">+90 ...</div>
                 </div>
-
-                <!-- Services Grid -->
-                <div id="servicesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <!-- Populated via JavaScript -->
+                <div class="bg-slate-900 p-4 rounded-2xl text-center">
+                    <span class="text-xs text-slate-400 block mb-1">SMS Kodu:</span>
+                    <div id="res-code" class="text-2xl font-extrabold text-blue-400 font-mono animate-pulse">Kod bekleniyor...</div>
                 </div>
-            </div>
-
-            <!-- TAB 3: ACTIVE OPERATIONS -->
-            <div id="tab-active" class="hidden space-y-6">
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                    <h2 class="text-sm font-semibold text-white mb-4">Aktif Bekleyen Numaralar</h2>
-                    <div id="activeNumbersList" class="space-y-4">
-                        <div class="text-center py-12 text-slate-500 text-sm">
-                            <i class="fa-solid fa-inbox text-3xl mb-2"></i>
-                            <p>Aktif bekleyen numaranız bulunmuyor.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 4: HISTORY -->
-            <div id="tab-history" class="hidden space-y-6">
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                    <h2 class="text-sm font-semibold text-white mb-4">Geçmiş SMS İşlemleri</h2>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm text-slate-300">
-                            <thead class="bg-slate-800/50 text-xs text-slate-400 uppercase border-b border-slate-800">
-                                <tr>
-                                    <th class="p-3">Servis</th>
-                                    <th class="p-3">Numara</th>
-                                    <th class="p-3">Kod</th>
-                                    <th class="p-3">Tutar</th>
-                                    <th class="p-3">Durum</th>
-                                    <th class="p-3">Tarih</th>
-                                </tr>
-                            </thead>
-                            <tbody id="historyTableBody" class="divide-y divide-slate-800">
-                                <!-- Populated dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 5: API -->
-            <div id="tab-api" class="hidden space-y-6">
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                    <h2 class="text-lg font-semibold text-white">API Entegrasyon Bilgileri</h2>
-                    <p class="text-sm text-slate-400">Otomatik numara çekmek ve onay kodu almak için aşağıdaki API anahtarınızı kullanabilirsiniz.</p>
-                    
-                    <div class="space-y-2">
-                        <label class="text-xs text-slate-400 font-medium">API Token</label>
-                        <div class="flex items-center space-x-2">
-                            <input type="password" value="sms_live_9983a71bc99482753a" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-indigo-400 font-mono">
-                            <button onclick="alert('API Anahtarı kopyalandı!')" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm transition">Kopyala</button>
-                        </div>
-                    </div>
-
-                    <div class="pt-4 border-t border-slate-800 space-y-2">
-                        <h3 class="text-sm font-semibold text-white">Örnek cURL İstegi</h3>
-                        <pre class="bg-slate-950 p-4 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto border border-slate-800">curl -X GET "https://api.smsonaypro.com/v1/getNumber?service=whatsapp&country=tr" \
--H "Authorization: Bearer sms_live_9983a71bc99482753a"</pre>
-                    </div>
-                </div>
-            </div>
-
-        </main>
-    </div>
-
-    <!-- Deposit Modal -->
-    <div id="depositModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4">
-            <div class="flex justify-between items-center">
-                <h3 class="text-base font-semibold text-white">Bakiye Yükle</h3>
-                <button onclick="closeModal('depositModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-slate-400">Yüklenecek Tutar (TL)</label>
-                    <input type="number" id="depositAmount" value="200" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
-                </div>
-                <div class="grid grid-cols-3 gap-2">
-                    <button onclick="setDeposit(100)" class="bg-slate-800 hover:bg-slate-700 text-xs py-2 rounded-lg border border-slate-700">₺100</button>
-                    <button onclick="setDeposit(500)" class="bg-slate-800 hover:bg-slate-700 text-xs py-2 rounded-lg border border-slate-700">₺500</button>
-                    <button onclick="setDeposit(1000)" class="bg-slate-800 hover:bg-slate-700 text-xs py-2 rounded-lg border border-slate-700">₺1000</button>
-                </div>
-            </div>
-            <div class="pt-4 flex justify-end space-x-3">
-                <button onclick="closeModal('depositModal')" class="bg-slate-800 hover:bg-slate-700 text-xs px-4 py-2 rounded-lg">İptal</button>
-                <button onclick="processDeposit()" class="bg-indigo-600 hover:bg-indigo-500 text-xs px-4 py-2 rounded-lg font-medium text-white">Ödeme Yap</button>
+                <button onclick="closeOrderModal(); location.reload();" class="w-full bg-slate-800 text-slate-300 py-3 rounded-2xl text-xs font-bold">Kapat</button>
             </div>
         </div>
     </div>
 
-    <!-- Support Modal -->
-    <div id="supportModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4">
-            <div class="flex justify-between items-center">
-                <h3 class="text-base font-semibold text-white">Destek Talebi Oluştur</h3>
-                <button onclick="closeModal('supportModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+    <div id="auth-modal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
+        <div class="glass w-full max-w-md rounded-3xl p-8 border border-blue-500/40 relative animate-modal shadow-2xl">
+            <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-2xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            <div class="flex space-x-2 mb-6 bg-slate-900 p-1.5 rounded-2xl">
+                <button onclick="switchAuthTab('login')" id="tab-login-btn" class="flex-1 py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white">Giriş Yap</button>
+                <button onclick="switchAuthTab('register')" id="tab-register-btn" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-400">Kayıt Ol</button>
+            </div>
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                <input type="text" id="login-username" placeholder="Kullanıcı Adı" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
+                <input type="password" id="login-password" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
+                <button type="submit" class="w-full bg-blue-600 text-white font-extrabold py-3 rounded-2xl text-xs">Giriş Yap</button>
+            </form>
+            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+                <input type="text" id="reg-username" placeholder="Kullanıcı Adı" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
+                <input type="password" id="reg-password" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
+                <button type="submit" class="w-full bg-emerald-600 text-white font-extrabold py-3 rounded-2xl text-xs">Kayıt Ol (25 TL Bonus)</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="deposit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
+        <div class="glass w-full max-w-md rounded-3xl p-8 border border-blue-500/40 relative animate-modal shadow-2xl">
+            <button onclick="closeDepositModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-2xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            <h3 class="text-base font-extrabold text-white mb-2">Bakiye Yükleme (Garanti - Resul Sakal)</h3>
+            <div class="bg-slate-950 p-4 rounded-2xl border border-blue-500/20 mb-4 text-xs space-y-2">
+                <div class="flex justify-between"><span class="text-slate-400">Alıcı:</span> <span class="text-emerald-400 font-bold">Resul Sakal</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">IBAN:</span> <span class="text-blue-300 font-mono">TR62 0006 2000 5000 0006 8107 73</span></div>
             </div>
             <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-slate-400">Konu</label>
-                    <input type="text" placeholder="Örn: Kod gelmedi iade talebi" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400">Mesajınız</label>
-                    <textarea rows="3" placeholder="Detayları açıklayın..." class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"></textarea>
-                </div>
-            </div>
-            <div class="pt-4 flex justify-end space-x-3">
-                <button onclick="closeModal('supportModal')" class="bg-slate-800 hover:bg-slate-700 text-xs px-4 py-2 rounded-lg">İptal</button>
-                <button onclick="submitSupport()" class="bg-indigo-600 hover:bg-indigo-500 text-xs px-4 py-2 rounded-lg font-medium text-white">Gönder</button>
+                <input type="text" id="dep-sender" placeholder="Adınız Soyadınız" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
+                <input type="number" id="dep-amount" placeholder="Tutar (TL)" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
+                <button onclick="sendDepositNotice()" class="w-full bg-emerald-600 text-white font-extrabold py-3 rounded-2xl text-xs">Bildirim Gönder</button>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript Application Logic -->
+    <div id="admin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
+        <div class="glass w-full max-w-4xl rounded-3xl p-6 border border-amber-500/40 relative animate-modal shadow-2xl max-h-[90vh] overflow-y-auto">
+            <button onclick="closeAdminModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-2xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            <div id="admin-login-screen">
+                <h3 class="text-xl font-extrabold text-white mb-4">Admin Girişi</h3>
+                <input type="password" id="admin-pass-input" placeholder="Şifre" class="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white mb-4">
+                <button onclick="loadAdminPanel()" class="w-full max-w-sm bg-amber-600 text-white font-extrabold py-3 rounded-2xl text-xs block">Giriş</button>
+            </div>
+            <div id="admin-dashboard" class="hidden space-y-6">
+                <h3 class="text-xl font-extrabold text-amber-400">Yönetim Paneli</h3>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-slate-900 p-4 rounded-2xl"><span class="text-xs text-slate-400 block">Ziyaretçi</span><span id="adm-vis-count" class="text-xl font-bold text-white">0</span></div>
+                    <div class="bg-slate-900 p-4 rounded-2xl"><span class="text-xs text-slate-400 block">Kullanıcı</span><span id="adm-user-count" class="text-xl font-bold text-emerald-400">0</span></div>
+                    <div class="bg-slate-900 p-4 rounded-2xl"><span class="text-xs text-slate-400 block">Bekleyen Ödeme</span><span id="adm-dep-count" class="text-xl font-bold text-amber-400">0</span></div>
+                </div>
+                <div class="bg-slate-900 rounded-2xl overflow-hidden">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-800 text-slate-400"><tr><th class="p-3">Kullanıcı</th><th class="p-3">Gönderen</th><th class="p-3">Tutar</th><th class="p-3">Durum</th><th class="p-3 text-right">İşlem</th></tr></thead>
+                        <tbody id="adm-deposit-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="glass border-t border-blue-900/30 text-center py-6 text-xs text-slate-500">&copy; 2026 ANKA SMS HİZMETLERİ</footer>
+
     <script>
-        let balance = 1450.00;
-        let activeOperations = [];
-        let historyRecords = [
-            { service: 'WhatsApp', country: 'TR', number: '+90 555 123 45 67', code: '482910', price: '₺12.50', status: 'Tamamlandı', date: '29.09.2026 14:20' },
-            { service: 'Telegram', country: 'US', number: '+1 202 555 0192', code: '9921', price: '₺8.00', status: 'Tamamlandı', date: '29.09.2026 12:10' }
-        ];
+        window.addEventListener('load', () => { setTimeout(() => { const s = document.getElementById('splash-screen'); s.style.opacity = '0'; setTimeout(() => s.style.display = 'none', 800); }, 1200); });
+        let currentUsername = localStorage.getItem('sms_username') || '';
+        let selectedProductData = null, currentBalance = 0, allServicesData = [], currentCategory = 'Tümü', checkInterval = null;
 
-        const servicesData = [
-            { id: 1, name: 'WhatsApp', category: 'Mesajlaşma', price: 12.50, country: 'tr', flag: '🇹🇷', stock: 1420 },
-            { id: 2, name: 'Telegram', category: 'Mesajlaşma', price: 8.00, country: 'us', flag: '🇺🇸', stock: 850 },
-            { id: 3, name: 'Google / Gmail', category: 'Doğrulama', price: 6.50, country: 'tr', flag: '🇹🇷', stock: 3200 },
-            { id: 4, name: 'Instagram', category: 'Sosyal Medya', price: 10.00, country: 'gb', flag: '🇬🇧', stock: 610 },
-            { id: 5, name: 'TikTok', category: 'Sosyal Medya', price: 7.50, country: 'de', flag: '🇩🇪', stock: 430 },
-            { id: 6, name: 'Twitter / X', category: 'Sosyal Medya', price: 9.00, country: 'us', flag: '🇺🇸', stock: 920 },
-            { id: 7, name: 'Discord', category: 'Oyun & Sohbet', price: 5.00, country: 'tr', flag: '🇹🇷', stock: 1150 },
-            { id: 8, name: 'Netflix', category: 'Eğlence', price: 15.00, country: 'us', flag: '🇺🇸', stock: 120 }
-        ];
+        async function fetchInitialData() {
+            try {
+                const sRes = await fetch('/api/getServices');
+                const sJson = await sRes.json();
+                if(sJson.success) { allServicesData = sJson.services; renderServices(allServicesData); }
+                if(currentUsername) {
+                    document.getElementById('user-profile-text').innerText = currentUsername;
+                    const bRes = await fetch(\`/api/getCustomerBalance?username=\${currentUsername}\`);
+                    const bJson = await bRes.json();
+                    if(bJson.success) { currentBalance = bJson.balance; document.getElementById('customer-balance').innerText = currentBalance.toFixed(2) + ' TL'; }
+                }
+            } catch(e) {}
+        }
+        fetchInitialData();
 
-        function switchTab(tabId) {
-            ['dashboard', 'services', 'active', 'history', 'api'].forEach(t => {
-                document.getElementById(`tab-${t}`).classList.add('hidden');
-                document.getElementById(`nav-${t}`).className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:bg-slate-800 hover:text-white";
-            });
-            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
-            document.getElementById(`nav-${tabId}`).className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition bg-indigo-600 text-white shadow-md shadow-indigo-600/20";
+        function renderServices(services) {
+            const grid = document.getElementById('services-grid');
+            grid.innerHTML = services.map(s => \`
+                <div class="glass-card p-6 rounded-3xl flex flex-col justify-between \${s.border}">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="w-14 h-14 \${s.bg} rounded-2xl flex items-center justify-center \${s.color} text-2xl"><i class="fa-brands \${s.icon}"></i></div>
+                            <span class="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-400">\${s.price} TL</span>
+                        </div>
+                        <span class="text-[10px] uppercase font-bold text-slate-500 mb-1 block">\${s.category}</span>
+                        <h3 class="text-base font-extrabold text-white mb-3">\${s.name}</h3>
+                    </div>
+                    <button onclick='openOrderModal(\${JSON.stringify(s)})' class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3 rounded-2xl text-xs transition">Satın Al</button>
+                </div>
+            \`).join('');
         }
 
-        function renderServices(items) {
-            const grid = document.getElementById('servicesGrid');
-            grid.innerHTML = items.map(s => `
-                <div class="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-4 flex flex-col justify-between transition">
-                    <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center space-x-2">
-                            <span class="text-xl">${s.flag}</span>
-                            <div>
-                                <h3 class="text-sm font-semibold text-white">${s.name}</h3>
-                                <span class="text-[10px] text-slate-400">${s.category}</span>
-                            </div>
-                        </div>
-                        <span class="text-xs px-2 py-1 bg-slate-800 text-slate-300 rounded-full">${s.stock} stok</span>
-                    </div>
-                    <div class="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/80">
-                        <div>
-                            <span class="text-[10px] text-slate-400 block">Fiyat</span>
-                            <span class="text-sm font-bold text-emerald-400">₺${s.price.toFixed(2)}</span>
-                        </div>
-                        <button onclick="buyNumber('${s.name}', ${s.price}, '${s.flag}')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-2 rounded-lg transition font-medium">Numara Al</button>
-                    </div>
-                </div>
-            `).join('');
+        function filterCategory(cat) {
+            currentCategory = cat;
+            renderServices(cat === 'Tümü' ? allServicesData : allServicesData.filter(s => s.category === cat));
         }
 
         function filterServices() {
-            const query = document.getElementById('serviceSearch').value.toLowerCase();
-            const country = document.getElementById('countryFilter').value;
-            const filtered = servicesData.filter(s => {
-                const matchQuery = s.name.toLowerCase().includes(query) || s.category.toLowerCase().includes(query);
-                const matchCountry = country === 'all' || s.country === country;
-                return matchQuery && matchCountry;
-            });
-            renderServices(filtered);
+            const q = document.getElementById('search-input').value.toLowerCase();
+            renderServices(allServicesData.filter(s => s.name.toLowerCase().includes(q) && (currentCategory === 'Tümü' || s.category === currentCategory)));
         }
 
-        function buyNumber(serviceName, price, flag) {
-            if (balance < price) {
-                alert('Yetersiz bakiye! Lütfen bakiye yükleyin.');
-                openModal('depositModal');
-                return;
-            }
-            balance -= price;
-            updateBalanceDisplay();
+        function openOrderModal(product) {
+            if(!currentUsername) { alert('Lütfen giriş yapın!'); openAuthModal(); return; }
+            selectedProductData = product;
+            document.getElementById('modal-product-title').innerText = product.name;
+            document.getElementById('modal-product-price').innerText = product.price + ' TL';
+            document.getElementById('modal-user-balance').innerText = currentBalance.toFixed(2) + ' TL';
+            document.getElementById('order-step-1').classList.remove('hidden');
+            document.getElementById('order-step-2').classList.add('hidden');
+            document.getElementById('order-modal').classList.remove('hidden');
+        }
+        function closeOrderModal() { document.getElementById('order-modal').classList.add('hidden'); if(checkInterval) clearInterval(checkInterval); }
 
-            const randomNum = `${flag} +90 5${Math.floor(Math.random()*90+10)} ${Math.floor(Math.random()*900+100)} ${Math.floor(Math.random()*90+10)} ${Math.floor(Math.random()*90+10)}`;
-            const newOp = {
-                id: Date.now(),
-                service: serviceName,
-                number: randomNum,
-                price: `₺${price.toFixed(2)}`,
-                code: 'Bekleniyor...',
-                timeRemaining: 120,
-                status: 'Bekliyor'
-            };
-
-            activeOperations.push(newOp);
-            updateActiveBadge();
-            renderActiveOperations();
-            switchTab('active');
+        async function executeBuy() {
+            const res = await fetch('/api/buyNumber', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productKey: selectedProductData.id, username: currentUsername }) });
+            const json = await res.json();
+            if(json.success) {
+                document.getElementById('order-step-1').classList.add('hidden');
+                document.getElementById('order-step-2').classList.remove('hidden');
+                document.getElementById('res-phone').innerText = json.phoneNumber;
+                document.getElementById('customer-balance').innerText = json.remainingBalance.toFixed(2) + ' TL';
+                currentBalance = json.remainingBalance;
+                checkInterval = setInterval(async () => {
+                    const r = await fetch(\`/api/checkSms/\${json.activationId}\`);
+                    const j = await r.json();
+                    if(j.success && j.status === 'completed') { document.getElementById('res-code').innerText = j.code; clearInterval(checkInterval); }
+                }, 3000);
+            } else { alert(json.message); }
         }
 
-        function renderActiveOperations() {
-            const container = document.getElementById('activeNumbersList');
-            if (activeOperations.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-12 text-slate-500 text-sm">
-                        <i class="fa-solid fa-inbox text-3xl mb-2"></i>
-                        <p>Aktif bekleyen numaranız bulunmuyor.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = activeOperations.map(op => `
-                <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div class="space-y-1">
-                        <div class="flex items-center space-x-2">
-                            <span class="text-sm font-semibold text-white">${op.service}</span>
-                            <span class="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full font-medium">Kod Bekleniyor</span>
-                        </div>
-                        <div class="font-mono text-indigo-400 text-sm">${op.number}</div>
-                    </div>
-                    <div class="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end">
-                        <div class="text-right">
-                            <span class="text-xs text-slate-400 block">Gelen Kod</span>
-                            <span class="text-sm font-mono font-bold text-emerald-400 bg-slate-900 px-3 py-1 rounded border border-slate-800">${op.code}</span>
-                        </div>
-                        <button onclick="cancelOperation(${op.id})" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 text-xs px-3 py-2 rounded-lg transition border border-rose-800/40">İptal Et</button>
-                    </div>
-                </div>
-            `).join('');
+        function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
+        function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
+        function switchAuthTab(tab) {
+            if(tab === 'login') { document.getElementById('login-form').classList.remove('hidden'); document.getElementById('register-form').classList.add('hidden'); }
+            else { document.getElementById('register-form').classList.remove('hidden'); document.getElementById('login-form').classList.add('hidden'); }
         }
-
-        function cancelOperation(id) {
-            activeOperations = activeOperations.filter(op => op.id !== id);
-            updateActiveBadge();
-            renderActiveOperations();
+        async function handleLogin(e) {
+            e.preventDefault();
+            const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: document.getElementById('login-username').value, password: document.getElementById('login-password').value }) });
+            const json = await res.json();
+            if(json.success) { currentUsername = json.username; localStorage.setItem('sms_username', currentUsername); closeAuthModal(); fetchInitialData(); } else { alert(json.message); }
         }
-
-        function updateActiveBadge() {
-            document.getElementById('activeCountBadge').innerText = activeOperations.length;
+        async function handleRegister(e) {
+            e.preventDefault();
+            const res = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: document.getElementById('reg-username').value, password: document.getElementById('reg-password').value }) });
+            const json = await res.json();
+            if(json.success) { currentUsername = json.username; localStorage.setItem('sms_username', currentUsername); closeAuthModal(); fetchInitialData(); } else { alert(json.message); }
         }
-
-        function updateBalanceDisplay() {
-            document.getElementById('headerBalance').innerText = `₺${balance.toFixed(2)}`;
+        function openDepositModal() { document.getElementById('deposit-modal').classList.remove('hidden'); }
+        function closeDepositModal() { document.getElementById('deposit-modal').classList.add('hidden'); }
+        async function sendDepositNotice() {
+            const res = await fetch('/api/deposit/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUsername, senderName: document.getElementById('dep-sender').value, amount: document.getElementById('dep-amount').value }) });
+            const json = await res.json(); alert(json.message); closeDepositModal();
         }
-
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.getElementById(id).classList.add('flex'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }
-        function setDeposit(amount) { document.getElementById('depositAmount').value = amount; }
-        function processDeposit() {
-            const amt = parseFloat(document.getElementById('depositAmount').value);
-            if (amt > 0) {
-                balance += amt;
-                updateBalanceDisplay();
-                closeModal('depositModal');
-                alert(`₺${amt.toFixed(2)} başarıyla eklendi!`);
+        function openAdminModal() { document.getElementById('admin-modal').classList.remove('hidden'); }
+        function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
+        async function loadAdminPanel() {
+            if(document.getElementById('admin-pass-input').value !== 'aklomanti') { alert('Hatalı şifre!'); return; }
+            const res = await fetch('/api/admin/data'); const json = await res.json();
+            if(json.success) {
+                document.getElementById('admin-login-screen').classList.add('hidden');
+                document.getElementById('admin-dashboard').classList.remove('hidden');
+                document.getElementById('adm-vis-count').innerText = json.visitorsCount;
+                document.getElementById('adm-user-count').innerText = json.usersCount;
+                document.getElementById('adm-dep-count').innerText = json.depositRequests.filter(d => d.status === 'Bekliyor').length;
+                document.getElementById('adm-deposit-table').innerHTML = json.depositRequests.map(d => \`
+                    <tr class="border-b border-slate-800">
+                        <td class="p-3">\${d.username}</td><td class="p-3">\${d.senderName}</td><td class="p-3 text-emerald-400">\${d.amount} TL</td>
+                        <td class="p-3">\${d.status}</td>
+                        <td class="p-3 text-right">\${d.status === 'Bekliyor' ? \`<button onclick="adminAction(\${d.id}, 'approve')" class="bg-emerald-600 text-white px-2 py-1 rounded">Onayla</button>\` : ''}</td>
+                    </tr>
+                \`).join('');
             }
         }
-        function submitSupport() {
-            closeModal('supportModal');
-            alert('Destek talebiniz alındı. En kısa sürede dönüş yapılacaktır.');
+        async function adminAction(actionId, decision) {
+            await fetch('/api/admin/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'aklomanti', actionId, decision }) });
+            loadAdminPanel();
         }
-
-        function renderHistory() {
-            const tbody = document.getElementById('historyTableBody');
-            tbody.innerHTML = historyRecords.map(h => `
-                <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-                    <td class="p-3 font-medium text-white">${h.service} (${h.country})</td>
-                    <td class="p-3 font-mono text-slate-300">${h.number}</td>
-                    <td class="p-3 font-mono text-emerald-400">${h.code}</td>
-                    <td class="p-3 text-slate-300">${h.price}</td>
-                    <td class="p-3"><span class="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-full">${h.status}</span></td>
-                    <td class="p-3 text-slate-500 text-xs">${h.date}</td>
-                </tr>
-            `).join('');
-        }
-
-        // Initialize Chart
-        window.addEventListener('DOMContentLoaded', () => {
-            renderServices(servicesData);
-            renderHistory();
-
-            const ctx = document.getElementById('spendingChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'],
-                    datasets: [{
-                        label: 'Harcama (TL)',
-                        data: [240, 450, 310, 520, 680, 410, 830],
-                        borderColor: '#6366f1',
-                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: '#64748b' } },
-                        y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b' } }
-                    }
-                }
-            });
-        });
     </script>
 </body>
-</html>
+</html>`);
+});
+
+app.listen(PORT, () => {
+    console.log('Sunucu calisiyor, port:', PORT);
+});
