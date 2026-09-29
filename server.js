@@ -28,28 +28,44 @@ async function sendTelegramNotification(message) {
 
 // Veritabanı ve Bellek Yapıları
 let users = {
-    "aklomanti": { balance: 1000.00, password: "123" }
+    "aklomanti": { balance: 1500.00, password: "123" }
 };
 
 let visitorsCount = 0;
 let recentVisitors = [];
 let depositRequests = [];
 
-// Onaylasms.com.tr Genişletilmiş Servis ve Ülke Havuzu (Tam Entegrasyon)
-const fullServicesCatalog = [
+// ANKA SMS HİZMETLERİ - Genişletilmiş Servis ve Ülke Kataloğu
+const ankaCatalog = [
+    // Türkiye
     { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, category: "Popüler", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
     { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 220, category: "Popüler", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
     { id: "ig_tr", service: "ig", country: "1", name: "Instagram Türkiye", price: 250, category: "Sosyal Medya", icon: "fa-instagram", color: "text-pink-400", bg: "bg-pink-500/15", border: "border-pink-500/40" },
     { id: "fb_tr", service: "fb", country: "1", name: "Facebook Türkiye", price: 180, category: "Sosyal Medya", icon: "fa-facebook", color: "text-blue-500", bg: "bg-blue-600/15", border: "border-blue-600/40" },
     { id: "tw_tr", service: "tw", country: "1", name: "Twitter / X Türkiye", price: 200, category: "Sosyal Medya", icon: "fa-twitter", color: "text-sky-400", bg: "bg-sky-500/15", border: "border-sky-500/40" },
     { id: "go_tr", service: "go", country: "1", name: "Google / Gmail Türkiye", price: 150, category: "Genel", icon: "fa-google", color: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40" },
-    
-    { id: "tg_usa", service: "tg", country: "18", name: "Telegram ABD", price: 150, category: "Yurtdışı", icon: "fa-telegram", color: "text-indigo-400", bg: "bg-indigo-500/15", border: "border-indigo-500/40" },
-    { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 120, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" },
-    { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 160, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
-    { id: "ig_usa", service: "ig", country: "18", name: "Instagram ABD", price: 130, category: "Yurtdışı", icon: "fa-instagram", color: "text-pink-400", bg: "bg-pink-500/15", border: "border-pink-500/40" },
     { id: "nf_tr", service: "nf", country: "1", name: "Netflix Türkiye", price: 280, category: "Eğlence", icon: "fa-film", color: "text-red-500", bg: "bg-red-600/15", border: "border-red-600/40" },
-    { id: "bl_tr", service: "bl", country: "1", name: "Blutv / Exxen", price: 190, category: "Eğlence", icon: "fa-tv", color: "text-violet-400", bg: "bg-violet-500/15", border: "border-violet-500/40" }
+    { id: "bl_tr", service: "bl", country: "1", name: "Exxen / Blutv Türkiye", price: 190, category: "Eğlence", icon: "fa-tv", color: "text-violet-400", bg: "bg-violet-500/15", border: "border-violet-500/40" },
+    { id: "tk_tr", service: "tk", country: "1", name: "TikTok Türkiye", price: 210, category: "Sosyal Medya", icon: "fa-tiktok", color: "text-white", bg: "bg-slate-700/50", border: "border-slate-600" },
+    { id: "sn_tr", service: "sn", country: "1", name: "Snapchat Türkiye", price: 170, category: "Sosyal Medya", icon: "fa-snapchat", color: "text-yellow-400", bg: "bg-yellow-500/15", border: "border-yellow-500/40" },
+
+    // ABD (Amerika Birleşik Devletleri)
+    { id: "wa_usa", service: "wa", country: "18", name: "WhatsApp ABD", price: 140, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
+    { id: "tg_usa", service: "tg", country: "18", name: "Telegram ABD", price: 150, category: "Yurtdışı", icon: "fa-telegram", color: "text-indigo-400", bg: "bg-indigo-500/15", border: "border-indigo-500/40" },
+    { id: "ig_usa", service: "ig", country: "18", name: "Instagram ABD", price: 130, category: "Yurtdışı", icon: "fa-instagram", color: "text-pink-400", bg: "bg-pink-500/15", border: "border-pink-500/40" },
+    { id: "go_usa", service: "go", country: "18", name: "Google ABD", price: 100, category: "Yurtdışı", icon: "fa-google", color: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40" },
+
+    // İngiltere
+    { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 160, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
+    { id: "tg_uk", service: "tg", country: "2", name: "Telegram İngiltere", price: 170, category: "Yurtdışı", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
+
+    // Filipinler
+    { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 120, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" },
+    { id: "tg_ph", service: "tg", country: "4", name: "Telegram Filipinler", price: 110, category: "Yurtdışı", icon: "fa-telegram", color: "text-teal-500", bg: "bg-teal-600/15", border: "border-teal-600/40" },
+
+    // Endonezya & Rusya
+    { id: "wa_id", service: "wa", country: "6", name: "WhatsApp Endonezya", price: 90, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
+    { id: "tg_ru", service: "tg", country: "0", name: "Telegram Rusya", price: 95, category: "Yurtdışı", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" }
 ];
 
 app.use((req, res, next) => {
@@ -62,7 +78,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/api/getServices', (req, res) => {
-    res.json({ success: true, services: fullServicesCatalog });
+    res.json({ success: true, services: ankaCatalog });
 });
 
 app.get('/api/getCustomerBalance', (req, res) => {
@@ -90,11 +106,11 @@ app.post('/api/auth/register', (req, res) => {
     if (users[username]) {
         return res.status(400).json({ success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
     }
-    users[username] = { password, balance: 20.00 }; // 20 TL hoşgeldin bonusu
-    res.json({ success: true, message: 'Kayıt başarılı! 20 TL bonus hesabınıza eklendi.', username, balance: 20.00 });
+    users[username] = { password, balance: 25.00 }; // 25 TL hoşgeldin bonusu
+    res.json({ success: true, message: 'Kayıt başarılı! 25 TL bonus hesabınıza eklendi.', username, balance: 25.00 });
 });
 
-// Numara Satın Alma (OnaylaSMS Entegrasyonu)
+// Numara Satın Alma (Senin API Anahtarın Üzerinden)
 app.post('/api/buyNumber', async (req, res) => {
     const { productKey, username } = req.body;
     
@@ -102,7 +118,7 @@ app.post('/api/buyNumber', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Oturum bulunamadı. Lütfen giriş yapın.' });
     }
 
-    const product = fullServicesCatalog.find(s => s.id === productKey);
+    const product = ankaCatalog.find(s => s.id === productKey);
     if (!product) {
         return res.status(400).json({ success: false, message: 'Ürün bulunamadı.' });
     }
@@ -131,7 +147,7 @@ app.post('/api/buyNumber', async (req, res) => {
                 message: 'Numara başarıyla alındı!'
             });
         } else {
-            return res.status(400).json({ success: false, message: `OnaylaSMS Tedarikçi Hatası: ${resultText}` });
+            return res.status(400).json({ success: false, message: `Sistem Tedarikçi Hatası: ${resultText}` });
         }
     } catch (error) {
         res.status(500).json({ success: false, message: 'Sunucu bağlantı hatası.', error: error.message });
@@ -175,7 +191,7 @@ app.post('/api/deposit/notify', async (req, res) => {
 
     depositRequests.push(newDep);
 
-    const msg = `🔔 <b>YENİ ÖDEME BİLDİRİMİ!</b>\n\n` +
+    const msg = `🔔 <b>ANKA SMS - YENİ ÖDEME BİLDİRİMİ!</b>\n\n` +
                 `👤 <b>Kullanıcı:</b> ${newDep.username}\n` +
                 `💳 <b>Gönderen:</b> ${newDep.senderName}\n` +
                 `💰 <b>Tutar:</b> ${newDep.amount} TL\n` +
@@ -224,14 +240,14 @@ app.post('/api/admin/action', (req, res) => {
     res.json({ success: true, message: `İşlem başarıyla güncellendi: ${dep.status}` });
 });
 
-// Ana Sayfa HTML
+// Ana Sayfa HTML (ANKA CANLI SMS HİZMETLERİ + 4K INTRO ANİMASYONU)
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMSPATRONUM - Premium SMS Onay Paneli</title>
+    <title>ANKA SMS HİZMETLERİ - Profesyonel SMS Onay Paneli</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -250,19 +266,44 @@ app.get('/', (req, res) => {
 
         @keyframes floatAnim { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
         .support-float { animation: floatAnim 3s ease-in-out infinite; }
+
+        /* INTRO SPLASH SCREEN */
+        #splash-screen {
+            position: fixed; inset: 0; z-index: 9999;
+            background: #030712; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+        .splash-logo-box {
+            width: 90px; height: 90px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
+            border-radius: 30px; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.6);
+            animation: pulse 2s infinite;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+
+    <!-- 4K INTRO AÇILIŞ ANİMASYONU -->
+    <div id="splash-screen">
+        <div class="absolute w-96 h-96 bg-blue-600/20 rounded-full blur-3xl neon-bg-1"></div>
+        <div class="splash-logo-box mb-6 relative z-10">
+            <i class="fa-solid fa-feather text-white text-4xl"></i>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent relative z-10">ANKA SMS HİZMETLERİ</h1>
+        <p class="text-xs text-slate-400 mt-2 tracking-widest uppercase relative z-10">Güvenli Altyapı Yükleniyor...</p>
+    </div>
 
     <!-- Header -->
     <header class="glass sticky top-0 z-40 border-b border-blue-900/30 px-6 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3 cursor-pointer" onclick="location.reload()">
             <div class="w-11 h-11 bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/30">
-                <i class="fa-solid fa-crown text-white text-xl"></i>
+                <i class="fa-solid fa-feather text-white text-xl"></i>
             </div>
             <div>
-                <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">SMSPATRONUM</span>
-                <span class="block text-[10px] text-blue-400 font-extrabold tracking-widest">VIP SMS ALTYAPISI</span>
+                <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">ANKA SMS</span>
+                <span class="block text-[10px] text-blue-400 font-extrabold tracking-widest">CANLI HİZMETLER</span>
             </div>
         </div>
 
@@ -289,15 +330,15 @@ app.get('/', (req, res) => {
     <main class="max-w-6xl mx-auto px-4 py-10 w-full flex-grow">
         <div class="relative overflow-hidden glass p-8 sm:p-10 rounded-3xl mb-10 border border-blue-500/30 bg-gradient-to-r from-blue-950/50 via-slate-900/80 to-indigo-950/50 shadow-2xl">
             <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none neon-bg-1"></div>
-            <h1 class="text-2xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">OnaylaSMS Tam Entegre Havuz Paneli</h1>
-            <p class="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">Tüm ülke, servis, kategori ve operasyonlar doğrudan OnaylaSMS altyapısından anlık olarak çekilmektedir. İstediğiniz servisi aratın ve anında numara kiralayın.</p>
+            <h1 class="text-2xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">ANKA CAİ SMS HİZMETLERİ</h1>
+            <p class="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">Dünya genelinde yüzlerce platform için anında sanal numara kiralayın, SMS kodunuzu saniyeler içinde ekranda görün ve güvenle işlem yapın.</p>
         </div>
 
         <!-- Arama ve Kategori Filtreleme Çubuğu -->
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
             <div class="relative w-full sm:w-96">
                 <i class="fa-solid fa-search absolute left-4 top-3.5 text-slate-400 text-xs"></i>
-                <input type="text" id="search-input" oninput="filterServices()" placeholder="Servis veya ülke ara (Örn: WhatsApp, Telegram)..." class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
+                <input type="text" id="search-input" oninput="filterServices()" placeholder="Servis veya ülke ara (Örn: WhatsApp, Türkiye)..." class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
             </div>
             <div class="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0" id="category-filters">
                 <button onclick="filterCategory('Tümü')" class="cat-btn bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Tümü</button>
@@ -329,7 +370,7 @@ app.get('/', (req, res) => {
                     <i class="fa-solid fa-cart-shopping"></i>
                 </div>
                 <h3 id="modal-product-title" class="text-xl font-extrabold text-white mb-2">Ürün Adı</h3>
-                <p class="text-xs text-slate-400 mb-6">Seçtiğiniz ülke ve servis için OnaylaSMS üzerinden anında hat tahsis edilecektir.</p>
+                <p class="text-xs text-slate-400 mb-6">Seçtiğiniz ülke ve servis için anında hat tahsis edilecektir.</p>
                 
                 <div class="bg-slate-900/90 p-4 rounded-2xl border border-blue-500/20 mb-6 space-y-2.5 text-xs">
                     <div class="flex justify-between"><span class="text-slate-400">Ürün Fiyatı:</span> <span id="modal-product-price" class="font-extrabold text-emerald-400 text-sm">0 TL</span></div>
@@ -408,7 +449,7 @@ app.get('/', (req, res) => {
                     <label class="block text-xs text-slate-400 mb-1.5">Şifre Belirle</label>
                     <input type="password" id="reg-password" required class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
                 </div>
-                <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-xl shadow-emerald-600/30">Kayıt Ol ve 20 TL Kazan</button>
+                <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-xl shadow-emerald-600/30">Kayıt Ol ve 25 TL Kazan</button>
             </form>
         </div>
     </div>
@@ -460,7 +501,7 @@ app.get('/', (req, res) => {
                     <div>
                         <h3 class="text-xl font-extrabold text-amber-400 flex items-center space-x-2">
                             <i class="fa-solid fa-gauge-high"></i>
-                            <span>SMSPATRONUM - Admin Yönetim Paneli</span>
+                            <span>ANKA SMS - Admin Yönetim Paneli</span>
                         </h3>
                         <p class="text-xs text-slate-400">Canlı ziyaretçiler, bekleyen ödemeler ve finansal kontroller.</p>
                     </div>
@@ -516,10 +557,19 @@ app.get('/', (req, res) => {
 
     <!-- Footer -->
     <footer class="glass border-t border-blue-900/30 text-center py-6 text-xs text-slate-500">
-        &copy; 2026 SMSPATRONUM - Tüm Hakları Saklıdır.
+        &copy; 2026 ANKA CAİ SMS HİZMETLERİ - Tüm Hakları Saklıdır.
     </footer>
 
     <script>
+        // Intro ekranını 1.2 saniye sonra yavaşça kapat
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const splash = document.getElementById('splash-screen');
+                splash.style.opacity = '0';
+                setTimeout(() => splash.style.display = 'none', 800);
+            }, 1200);
+        });
+
         let currentUsername = localStorage.getItem('sms_username') || '';
         let selectedProductData = null;
         let currentBalance = 0;
@@ -566,7 +616,7 @@ app.get('/', (req, res) => {
                         </div>
                         <span class="text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1 block">\${s.category}</span>
                         <h3 class="text-base font-extrabold text-white mb-1.5">\${s.name}</h3>
-                        <p class="text-[11px] text-slate-400 mb-6 leading-relaxed">OnaylaSMS altyapısı ile anında numara tahsisi ve canlı SMS kod takibi.</p>
+                        <p class="text-[11px] text-slate-400 mb-6 leading-relaxed">ANKA altyapısı ile anında numara tahsisi ve canlı SMS kod takibi.</p>
                     </div>
                     <button onclick='openOrderModal(\${JSON.stringify(s)})' class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2">
                         <i class="fa-solid fa-cart-shopping"></i>
@@ -785,7 +835,7 @@ app.get('/', (req, res) => {
                             <td class="p-3 text-right space-x-1">
                                 \${d.status === 'Bekliyor' ? \`
                                     <button onclick="adminAction(\${d.id}, 'approve')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg font-bold">Onayla</button>
-                                    <button onclick="adminAction(\th.id}, 'reject')" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg font-bold">Reddet</button>
+                                    <button onclick="adminAction(\${d.id}, 'reject')" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg font-bold">Reddet</button>
                                 \` : '<span class="text-slate-500">Tamamlandı</span>'}
                             </td>
                         </tr>
