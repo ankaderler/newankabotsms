@@ -35,10 +35,10 @@ let visitorsCount = 0;
 let recentVisitors = [];
 let depositRequests = [];
 
-// ÜRÜN KATALOĞU VE İSTEDİĞİN FİYATLAR
+// GÜNCELLENMİŞ KATALOG VE FİYATLAR (Telegram TR: 200 TL)
 const ankaCatalog = [
     { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, category: "WhatsApp", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
-    { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 220, category: "Telegram", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
+    { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 200, category: "Telegram", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
     { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 200, category: "WhatsApp", icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
     { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 150, category: "WhatsApp", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" }
 ];
@@ -85,7 +85,7 @@ app.post('/api/auth/register', (req, res) => {
     res.json({ success: true, message: 'Kayıt başarılı! 25 TL bonus hesabınıza eklendi.', username, balance: 25.00 });
 });
 
-// ONAYLA SMS API'DEN NUMARA ÇEKME
+// NUMARA ÇEKME
 app.post('/api/buyNumber', async (req, res) => {
     const { productKey, username } = req.body;
     
@@ -165,7 +165,7 @@ app.post('/api/deposit/notify', async (req, res) => {
 
     depositRequests.push(newDep);
 
-    const msg = `🔔 <b>ANKA SMS - YENİ ÖDEME BİLDİRİMİ!</b>\n\n` +
+    const msg = `🔔 <b>ANKA CIA SMS - YENİ ÖDEME BİLDİRİMİ!</b>\n\n` +
                 `👤 <b>Kullanıcı:</b> ${newDep.username}\n` +
                 `💳 <b>Gönderen:</b> ${newDep.senderName}\n` +
                 `💰 <b>Tutar:</b> ${newDep.amount} TL\n` +
@@ -213,61 +213,64 @@ app.post('/api/admin/action', (req, res) => {
     res.json({ success: true, message: `İşlem güncellendi: ${dep.status}` });
 });
 
-// ULTRA MODERN ÖN YÜZ (FRONTEND)
+// ULTRA MODERN ÖN YÜZ (HACKER ARKA PLANLI)
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANKA SİYAHSMS HİZMETLERİ</title>
+    <title>ANKA CIA SMS HİZMETLERİ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f8fafc; overflow-x: hidden; }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: linear-gradient(rgba(3, 7, 18, 0.88), rgba(3, 7, 18, 0.92)), url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1920&auto=format&fit=crop') no-repeat center center fixed;
+            background-size: cover;
+            color: #f8fafc; 
+            overflow-x: hidden; 
+        }
         .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(24px); border: 1px solid rgba(59, 130, 246, 0.18); }
-        .glass-card { background: rgba(30, 41, 59, 0.45); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.06); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .glass-card:hover { transform: translateY(-6px); border-color: rgba(59, 130, 246, 0.5); box-shadow: 0 20px 40px -15px rgba(59, 130, 246, 0.25); }
+        .glass-card { background: rgba(30, 41, 59, 0.55); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .glass-card:hover { transform: translateY(-6px); border-color: rgba(34, 197, 94, 0.5); box-shadow: 0 20px 40px -15px rgba(34, 197, 94, 0.25); }
         @keyframes modalAnim { from { opacity: 0; transform: scale(0.85) translateY(30px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .animate-modal { animation: modalAnim 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        @keyframes neonPulse { 0%, 100% { opacity: 0.25; transform: scale(1); filter: blur(50px); } 50% { opacity: 0.6; transform: scale(1.1); filter: blur(70px); } }
-        .neon-bg-1 { animation: neonPulse 7s ease-in-out infinite; }
         .support-float { animation: floatAnim 3s ease-in-out infinite; }
         @keyframes floatAnim { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
         #splash-screen { position: fixed; inset: 0; z-index: 9999; background: #030712; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.7s ease, visibility 0.7s ease; }
-        .splash-logo-box { width: 85px; height: 85px; background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6); border-radius: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(59, 130, 246, 0.5); }
+        .splash-logo-box { width: 85px; height: 85px; background: linear-gradient(135deg, #10b981, #3b82f6); border-radius: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(16, 185, 129, 0.5); }
     </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-600 selection:text-white">
     <div id="splash-screen">
-        <div class="absolute w-96 h-96 bg-blue-600/20 rounded-full blur-3xl neon-bg-1"></div>
-        <div class="splash-logo-box mb-5 relative z-10"><i class="fa-solid fa-feather text-white text-3xl"></i></div>
-        <h1 class="text-xl sm:text-2xl font-extrabold tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent relative z-10">ANKA SİYAHSMS</h1>
-        <p class="text-[11px] text-slate-400 mt-2 tracking-widest uppercase relative z-10">Altyapı Yükleniyor...</p>
+        <div class="splash-logo-box mb-5 relative z-10"><i class="fa-solid fa-terminal text-white text-3xl"></i></div>
+        <h1 class="text-xl sm:text-2xl font-extrabold tracking-wider bg-gradient-to-r from-emerald-400 via-teal-300 to-white bg-clip-text text-transparent relative z-10">ANKA CIA SMS</h1>
+        <p class="text-[11px] text-slate-400 mt-2 tracking-widest uppercase relative z-10">Güvenli Altyapı Yükleniyor...</p>
     </div>
 
-    <header class="glass sticky top-0 z-40 border-b border-blue-900/20 px-6 py-4 flex items-center justify-between">
+    <header class="glass sticky top-0 z-40 border-b border-emerald-500/20 px-6 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3 cursor-pointer" onclick="location.reload()">
-            <div class="w-10 h-10 bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-                <i class="fa-solid fa-feather text-white text-lg"></i>
+            <div class="w-10 h-10 bg-gradient-to-tr from-emerald-600 via-teal-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <i class="fa-solid fa-shield-halved text-white text-lg"></i>
             </div>
             <div>
-                <span class="font-extrabold text-base tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">ANKA SİYAHSMS</span>
-                <span class="block text-[9px] text-blue-400 font-extrabold tracking-widest">ONAY SİSTEMİ</span>
+                <span class="font-extrabold text-base tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-white bg-clip-text text-transparent">ANKA CIA SMS</span>
+                <span class="block text-[9px] text-emerald-400 font-extrabold tracking-widest">GÜVENLİ ONAY SİSTEMİ</span>
             </div>
         </div>
         <div class="flex items-center space-x-2.5">
-            <div class="glass px-3.5 py-2 rounded-2xl flex items-center space-x-2 text-xs border-blue-500/20 shadow-inner">
+            <div class="glass px-3.5 py-2 rounded-2xl flex items-center space-x-2 text-xs border-emerald-500/20 shadow-inner">
                 <i class="fa-solid fa-wallet text-emerald-400"></i>
                 <span class="text-slate-400 hidden sm:inline">Bakiye:</span>
                 <span id="customer-balance" class="font-extrabold text-emerald-400 text-xs sm:text-sm">0.00 TL</span>
             </div>
-            <button onclick="openDepositModal()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-blue-600/25">
+            <button onclick="openDepositModal()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-600/25">
                 <i class="fa-solid fa-plus mr-1"></i> Bakiye Yükle
             </button>
             <button onclick="openAuthModal()" class="glass hover:bg-slate-800 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition border border-slate-700 flex items-center space-x-1.5">
-                <i class="fa-solid fa-user-circle text-blue-400 text-sm"></i>
+                <i class="fa-solid fa-user-circle text-emerald-400 text-sm"></i>
                 <span id="user-profile-text" class="hidden sm:inline">Giriş Yap</span>
             </button>
             <button onclick="openAdminModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-2 rounded-xl text-xs font-bold transition border border-amber-500/30" title="Admin">
@@ -277,11 +280,10 @@ app.get('/', (req, res) => {
     </header>
 
     <main class="max-w-5xl mx-auto px-4 py-10 w-full flex-grow">
-        <div class="relative overflow-hidden glass p-8 rounded-3xl mb-10 border border-blue-500/25 bg-gradient-to-r from-blue-950/40 via-slate-900/70 to-indigo-950/40 shadow-2xl">
-            <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-blue-500/15 rounded-full blur-3xl pointer-events-none neon-bg-1"></div>
+        <div class="relative overflow-hidden glass p-8 rounded-3xl mb-10 border border-emerald-500/25 bg-gradient-to-r from-slate-950/70 via-slate-900/80 to-emerald-950/40 shadow-2xl">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Anında Sanal Numara Al</h1>
-                <span class="text-lg sm:text-2xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 drop-shadow-md">ANKA SİYAHSMS HİZMETLERİ</span>
+                <span class="text-lg sm:text-2xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-blue-400 drop-shadow-md">ANKA CIA SMS HİZMETLERİ</span>
             </div>
             <p class="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">WhatsApp ve Telegram servisleriniz için anlık havuzdan numara çekin, kodunuzu saniyeler içinde ekranda görün.</p>
         </div>
@@ -289,10 +291,10 @@ app.get('/', (req, res) => {
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
             <div class="relative w-full sm:w-80">
                 <i class="fa-solid fa-search absolute left-4 top-3.5 text-slate-400 text-xs"></i>
-                <input type="text" id="search-input" oninput="filterServices()" placeholder="Servis ara (WhatsApp, Telegram...)" class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
+                <input type="text" id="search-input" oninput="filterServices()" placeholder="Servis ara (WhatsApp, Telegram...)" class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500 transition">
             </div>
             <div class="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0" id="category-filters">
-                <button onclick="filterCategory('Tümü')" class="cat-btn bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Tümü</button>
+                <button onclick="filterCategory('Tümü')" class="cat-btn bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Tümü</button>
                 <button onclick="filterCategory('WhatsApp')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">WhatsApp</button>
                 <button onclick="filterCategory('Telegram')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Telegram</button>
             </div>
@@ -301,21 +303,21 @@ app.get('/', (req, res) => {
         <div id="services-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-6 mb-12"></div>
     </main>
 
-    <a href="https://t.me/SMSPATRONUM" target="_blank" class="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3.5 rounded-full shadow-2xl flex items-center justify-center text-lg support-float border border-blue-400/40" title="Canlı Destek">
+    <a href="https://t.me/SMSPATRONUM" target="_blank" class="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-3.5 rounded-full shadow-2xl flex items-center justify-center text-lg support-float border border-emerald-400/40" title="Canlı Destek">
         <i class="fa-brands fa-telegram"></i>
     </a>
 
     <!-- Order Modal -->
     <div id="order-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="glass w-full max-w-md rounded-3xl p-7 border border-blue-500/40 relative animate-modal shadow-2xl">
+        <div class="glass w-full max-w-md rounded-3xl p-7 border border-emerald-500/40 relative animate-modal shadow-2xl">
             <button onclick="closeOrderModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-8 h-8 rounded-xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
             <div id="order-step-1">
                 <h3 id="modal-product-title" class="text-lg font-extrabold text-white mb-2">Servis Adı</h3>
-                <div class="bg-slate-900/90 p-4 rounded-2xl border border-blue-500/20 mb-6 space-y-2 text-xs">
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-emerald-500/20 mb-6 space-y-2 text-xs">
                     <div class="flex justify-between"><span class="text-slate-400">Servis Ücreti:</span> <span id="modal-product-price" class="font-extrabold text-emerald-400 text-sm">0 TL</span></div>
                     <div class="flex justify-between"><span class="text-slate-400">Mevcut Bakiyeniz:</span> <span id="modal-user-balance" class="font-extrabold text-white">0 TL</span></div>
                 </div>
-                <button onclick="executeBuy()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-lg shadow-blue-600/30">Numarayı Havuzdan Çek ve Başlat</button>
+                <button onclick="executeBuy()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-lg shadow-emerald-600/30">Numarayı Havuzdan Çek ve Başlat</button>
             </div>
             <div id="order-step-2" class="hidden space-y-4">
                 <div class="bg-emerald-500/10 border border-emerald-500/30 p-3.5 rounded-2xl text-emerald-400 font-bold text-xs text-center">Numara Başarıyla Tahsis Edildi!</div>
@@ -325,7 +327,7 @@ app.get('/', (req, res) => {
                 </div>
                 <div class="bg-slate-900 p-4 rounded-2xl text-center">
                     <span class="text-[10px] uppercase text-slate-400 tracking-wider block mb-1">Gelen SMS Kodu</span>
-                    <div id="res-code" class="text-2xl font-extrabold text-blue-400 font-mono animate-pulse">Kod Bekleniyor...</div>
+                    <div id="res-code" class="text-2xl font-extrabold text-emerald-400 font-mono animate-pulse">Kod Bekleniyor...</div>
                 </div>
                 <button onclick="closeOrderModal(); location.reload();" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-2xl text-xs font-bold transition">İşlemi Tamamla & Kapat</button>
             </div>
@@ -334,16 +336,16 @@ app.get('/', (req, res) => {
 
     <!-- Auth Modal -->
     <div id="auth-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="glass w-full max-w-sm rounded-3xl p-7 border border-blue-500/40 relative animate-modal shadow-2xl">
+        <div class="glass w-full max-w-sm rounded-3xl p-7 border border-emerald-500/40 relative animate-modal shadow-2xl">
             <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-8 h-8 rounded-xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
             <div class="flex space-x-1.5 mb-6 bg-slate-900 p-1 rounded-2xl">
-                <button onclick="switchAuthTab('login')" id="tab-login-btn" class="flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white transition">Giriş Yap</button>
+                <button onclick="switchAuthTab('login')" id="tab-login-btn" class="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white transition">Giriş Yap</button>
                 <button onclick="switchAuthTab('register')" id="tab-register-btn" class="flex-1 py-2 rounded-xl text-xs font-bold text-slate-400 transition">Kayıt Ol</button>
             </div>
             <form id="login-form" onsubmit="handleLogin(event)" class="space-y-3.5">
-                <input type="text" id="login-username" placeholder="Kullanıcı Adı" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500">
-                <input type="password" id="login-password" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500">
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-blue-600/30">Giriş Yap</button>
+                <input type="text" id="login-username" placeholder="Kullanıcı Adı" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
+                <input type="password" id="login-password" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-emerald-600/30">Giriş Yap</button>
             </form>
             <form id="register-form" onsubmit="handleRegister(event)" class="space-y-3.5 hidden">
                 <input type="text" id="reg-username" placeholder="Kullanıcı Adı" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
@@ -355,12 +357,12 @@ app.get('/', (req, res) => {
 
     <!-- Deposit Modal -->
     <div id="deposit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="glass w-full max-w-sm rounded-3xl p-7 border border-blue-500/40 relative animate-modal shadow-2xl">
+        <div class="glass w-full max-w-sm rounded-3xl p-7 border border-emerald-500/40 relative animate-modal shadow-2xl">
             <button onclick="closeDepositModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-8 h-8 rounded-xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
             <h3 class="text-sm font-extrabold text-white mb-2">Bakiye Yükleme Bildirimi</h3>
-            <div class="bg-slate-950 p-3.5 rounded-2xl border border-blue-500/20 mb-4 text-[11px] space-y-1.5">
+            <div class="bg-slate-950 p-3.5 rounded-2xl border border-emerald-500/20 mb-4 text-[11px] space-y-1.5">
                 <div class="flex justify-between"><span class="text-slate-400">Alıcı:</span> <span class="text-emerald-400 font-bold">Resul Sakal</span></div>
-                <div class="flex justify-between"><span class="text-slate-400">IBAN:</span> <span class="text-blue-300 font-mono">TR62 0006 2000 5000 0006 8107 73</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">IBAN:</span> <span class="text-emerald-300 font-mono">TR62 0006 2000 5000 0006 8107 73</span></div>
             </div>
             <div class="space-y-3">
                 <input type="text" id="dep-sender" placeholder="Gönderen Adı Soyadı" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
@@ -396,7 +398,7 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
-    <footer class="glass border-t border-blue-900/20 text-center py-6 text-[11px] text-slate-500">&copy; 2026 ANKA SİYAHSMS HİZMETLERİ - Tüm Hakları Saklıdır.</footer>
+    <footer class="glass border-t border-emerald-500/20 text-center py-6 text-[11px] text-slate-500">&copy; 2026 ANKA CIA SMS HİZMETLERİ - Tüm Hakları Saklıdır.</footer>
 
     <script>
         window.addEventListener('load', () => { setTimeout(() => { const s = document.getElementById('splash-screen'); s.style.opacity = '0'; setTimeout(() => s.style.display = 'none', 700); }, 1000); });
@@ -429,13 +431,13 @@ app.get('/', (req, res) => {
                     <div>
                         <div class="flex items-center justify-between mb-4">
                             <div class="w-12 h-12 \${s.bg} rounded-2xl flex items-center justify-center \${s.color} text-xl"><i class="fa-brands \${s.icon}"></i></div>
-                            <span class="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-400">\${s.price} TL</span>
+                            <span class="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400">\${s.price} TL</span>
                         </div>
                         <span class="text-[9px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">\${s.category}</span>
                         <h3 class="text-base font-extrabold text-white mb-2">\${s.name}</h3>
                         <p class="text-xs text-slate-400">Anlık havuzdan hızlı SMS doğrulaması.</p>
                     </div>
-                    <button onclick='openOrderModal(\${JSON.stringify(s)})' class="mt-6 w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-md shadow-blue-600/20">Numara Satın Al</button>
+                    <button onclick='openOrderModal(\${JSON.stringify(s)})' class="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-md shadow-emerald-600/20">Numara Satın Al</button>
                 </div>
             \`).join('');
         }
@@ -444,7 +446,7 @@ app.get('/', (req, res) => {
             currentCategory = cat;
             document.querySelectorAll('.cat-btn').forEach(btn => {
                 if(btn.innerText.includes(cat)) {
-                    btn.className = "cat-btn bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0";
+                    btn.className = "cat-btn bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0";
                 } else {
                     btn.className = "cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0";
                 }
