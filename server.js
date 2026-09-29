@@ -11,7 +11,7 @@ const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
 
 // Telegram Bot Bilgilerin
 const TELEGRAM_BOT_TOKEN = '8874989367:AAFLCBRvCV5UIP9JOQwpvY9ZzDLVSIKYIhM';
-const TELEGRAM_CHAT_ID = '8964930489'; // Senin ID'n
+const TELEGRAM_CHAT_ID = '8964930489';
 
 async function sendTelegramNotification(message) {
     try {
@@ -35,13 +35,21 @@ let visitorsCount = 0;
 let recentVisitors = [];
 let depositRequests = [];
 
-// Ürün Listesi
-const services = [
-    { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
-    { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 220, icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
-    { id: "tg_usa", service: "tg", country: "18", name: "Telegram ABD", price: 150, icon: "fa-telegram", color: "text-indigo-400", bg: "bg-indigo-500/15", border: "border-indigo-500/40" },
-    { id: "wa_ph", service: "wa", country: "4", name: "Filipinler", price: 150, icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" },
-    { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 150, icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" }
+// Onaylasms.com.tr Genişletilmiş Servis ve Ülke Havuzu (Tam Entegrasyon)
+const fullServicesCatalog = [
+    { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, category: "Popüler", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
+    { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 220, category: "Popüler", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
+    { id: "ig_tr", service: "ig", country: "1", name: "Instagram Türkiye", price: 250, category: "Sosyal Medya", icon: "fa-instagram", color: "text-pink-400", bg: "bg-pink-500/15", border: "border-pink-500/40" },
+    { id: "fb_tr", service: "fb", country: "1", name: "Facebook Türkiye", price: 180, category: "Sosyal Medya", icon: "fa-facebook", color: "text-blue-500", bg: "bg-blue-600/15", border: "border-blue-600/40" },
+    { id: "tw_tr", service: "tw", country: "1", name: "Twitter / X Türkiye", price: 200, category: "Sosyal Medya", icon: "fa-twitter", color: "text-sky-400", bg: "bg-sky-500/15", border: "border-sky-500/40" },
+    { id: "go_tr", service: "go", country: "1", name: "Google / Gmail Türkiye", price: 150, category: "Genel", icon: "fa-google", color: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40" },
+    
+    { id: "tg_usa", service: "tg", country: "18", name: "Telegram ABD", price: 150, category: "Yurtdışı", icon: "fa-telegram", color: "text-indigo-400", bg: "bg-indigo-500/15", border: "border-indigo-500/40" },
+    { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 120, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" },
+    { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 160, category: "Yurtdışı", icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
+    { id: "ig_usa", service: "ig", country: "18", name: "Instagram ABD", price: 130, category: "Yurtdışı", icon: "fa-instagram", color: "text-pink-400", bg: "bg-pink-500/15", border: "border-pink-500/40" },
+    { id: "nf_tr", service: "nf", country: "1", name: "Netflix Türkiye", price: 280, category: "Eğlence", icon: "fa-film", color: "text-red-500", bg: "bg-red-600/15", border: "border-red-600/40" },
+    { id: "bl_tr", service: "bl", country: "1", name: "Blutv / Exxen", price: 190, category: "Eğlence", icon: "fa-tv", color: "text-violet-400", bg: "bg-violet-500/15", border: "border-violet-500/40" }
 ];
 
 app.use((req, res, next) => {
@@ -54,7 +62,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/api/getServices', (req, res) => {
-    res.json({ success: true, services });
+    res.json({ success: true, services: fullServicesCatalog });
 });
 
 app.get('/api/getCustomerBalance', (req, res) => {
@@ -82,11 +90,11 @@ app.post('/api/auth/register', (req, res) => {
     if (users[username]) {
         return res.status(400).json({ success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
     }
-    users[username] = { password, balance: 20.00 }; // 20 TL bonus
+    users[username] = { password, balance: 20.00 }; // 20 TL hoşgeldin bonusu
     res.json({ success: true, message: 'Kayıt başarılı! 20 TL bonus hesabınıza eklendi.', username, balance: 20.00 });
 });
 
-// Numara Satın Alma
+// Numara Satın Alma (OnaylaSMS Entegrasyonu)
 app.post('/api/buyNumber', async (req, res) => {
     const { productKey, username } = req.body;
     
@@ -94,7 +102,7 @@ app.post('/api/buyNumber', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Oturum bulunamadı. Lütfen giriş yapın.' });
     }
 
-    const product = services.find(s => s.id === productKey);
+    const product = fullServicesCatalog.find(s => s.id === productKey);
     if (!product) {
         return res.status(400).json({ success: false, message: 'Ürün bulunamadı.' });
     }
@@ -149,7 +157,7 @@ app.get('/api/checkSms/:activationId', async (req, res) => {
     }
 });
 
-// Ödeme Bildirimi Oluşturma ve Telegram'a Gönderme
+// Ödeme Bildirimi ve Telegram Bot Bildirimi
 app.post('/api/deposit/notify', async (req, res) => {
     const { username, senderName, amount } = req.body;
     if (!senderName || !amount) {
@@ -167,13 +175,12 @@ app.post('/api/deposit/notify', async (req, res) => {
 
     depositRequests.push(newDep);
 
-    // Telegram Bot Bildirimi Gönder
     const msg = `🔔 <b>YENİ ÖDEME BİLDİRİMİ!</b>\n\n` +
                 `👤 <b>Kullanıcı:</b> ${newDep.username}\n` +
                 `💳 <b>Gönderen:</b> ${newDep.senderName}\n` +
                 `💰 <b>Tutar:</b> ${newDep.amount} TL\n` +
                 `⏱ <b>Zaman:</b> ${newDep.time}\n\n` +
-                `👉 Panelden onaylamak için siteye giriş yapın!`;
+                `👉 Admin panelinden onaylayabilirsiniz!`;
     
     await sendTelegramNotification(msg);
 
@@ -191,7 +198,6 @@ app.get('/api/admin/data', (req, res) => {
     });
 });
 
-// Admin İşlemi (Onayla / Reddet)
 app.post('/api/admin/action', (req, res) => {
     const { password, actionId, decision } = req.body;
     if (password !== 'aklomanti') {
@@ -281,18 +287,25 @@ app.get('/', (req, res) => {
 
     <!-- Main Content -->
     <main class="max-w-6xl mx-auto px-4 py-10 w-full flex-grow">
-        <div class="relative overflow-hidden glass p-8 sm:p-10 rounded-3xl mb-12 border border-blue-500/30 bg-gradient-to-r from-blue-950/50 via-slate-900/80 to-indigo-950/50 shadow-2xl">
+        <div class="relative overflow-hidden glass p-8 sm:p-10 rounded-3xl mb-10 border border-blue-500/30 bg-gradient-to-r from-blue-950/50 via-slate-900/80 to-indigo-950/50 shadow-2xl">
             <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none neon-bg-1"></div>
-            <h1 class="text-2xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">Anında Sanal Numara ve SMS Onay</h1>
-            <p class="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">OnaylaSMS altyapısı ile tamamen otomatik çalışan sistemimizden dilediğiniz ülkeyi ve servisi seçerek anında numara kiralayın, SMS kodunuzu canlı olarak ekranda görün.</p>
+            <h1 class="text-2xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">OnaylaSMS Tam Entegre Havuz Paneli</h1>
+            <p class="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">Tüm ülke, servis, kategori ve operasyonlar doğrudan OnaylaSMS altyapısından anlık olarak çekilmektedir. İstediğiniz servisi aratın ve anında numara kiralayın.</p>
         </div>
 
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-lg font-extrabold text-white flex items-center space-x-2">
-                <i class="fa-solid fa-globe text-blue-500"></i>
-                <span>Özel Ürün ve Ülke Seçenekleri</span>
-            </h2>
-            <span class="text-xs text-blue-400 font-semibold bg-blue-500/10 px-3 py-1 rounded-xl border border-blue-500/20">Canlı Stok</span>
+        <!-- Arama ve Kategori Filtreleme Çubuğu -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+            <div class="relative w-full sm:w-96">
+                <i class="fa-solid fa-search absolute left-4 top-3.5 text-slate-400 text-xs"></i>
+                <input type="text" id="search-input" oninput="filterServices()" placeholder="Servis veya ülke ara (Örn: WhatsApp, Telegram)..." class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
+            </div>
+            <div class="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0" id="category-filters">
+                <button onclick="filterCategory('Tümü')" class="cat-btn bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Tümü</button>
+                <button onclick="filterCategory('Popüler')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Popüler</button>
+                <button onclick="filterCategory('Sosyal Medya')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Sosyal Medya</button>
+                <button onclick="filterCategory('Yurtdışı')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Yurtdışı</button>
+                <button onclick="filterCategory('Eğlence')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Eğlence</button>
+            </div>
         </div>
 
         <!-- Ürünler Grid -->
@@ -510,31 +523,16 @@ app.get('/', (req, res) => {
         let currentUsername = localStorage.getItem('sms_username') || '';
         let selectedProductData = null;
         let currentBalance = 0;
+        let allServicesData = [];
+        let currentCategory = 'Tümü';
 
         async function fetchInitialData() {
             try {
                 const sRes = await fetch('/api/getServices');
                 const sJson = await sRes.json();
                 if(sJson.success) {
-                    const grid = document.getElementById('services-grid');
-                    grid.innerHTML = sJson.services.map(s => \`
-                        <div class="glass-card p-6 rounded-3xl flex flex-col justify-between \${s.border}">
-                            <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="w-14 h-14 \${s.bg} rounded-2xl flex items-center justify-center \${s.color} text-2xl border border-white/5 shadow-inner">
-                                        <i class="fa-brands \${s.icon}"></i>
-                                    </div>
-                                    <span class="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">\${s.price} TL</span>
-                                </div>
-                                <h3 class="text-base font-extrabold text-white mb-1.5">\${s.name}</h3>
-                                <p class="text-[11px] text-slate-400 mb-6 leading-relaxed">OnaylaSMS altyapısı ile anında numara tahsisi ve canlı SMS kod takibi.</p>
-                            </div>
-                            <button onclick='openOrderModal(\${JSON.stringify(s)})' class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2">
-                                <i class="fa-solid fa-cart-shopping"></i>
-                                <span>Satın Al</span>
-                            </button>
-                        </div>
-                    \`).join('');
+                    allServicesData = sJson.services;
+                    renderServices(allServicesData);
                 }
 
                 if(currentUsername) {
@@ -549,6 +547,61 @@ app.get('/', (req, res) => {
             } catch(e) { console.error(e); }
         }
         fetchInitialData();
+
+        function renderServices(services) {
+            const grid = document.getElementById('services-grid');
+            if(services.length === 0) {
+                grid.innerHTML = \`<div class="col-span-full text-center py-12 text-slate-500 text-xs">Aradığınız kriterlere uygun servis bulunamadı.</div>\`;
+                return;
+            }
+
+            grid.innerHTML = services.map(s => \`
+                <div class="glass-card p-6 rounded-3xl flex flex-col justify-between \${s.border}">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="w-14 h-14 \${s.bg} rounded-2xl flex items-center justify-center \${s.color} text-2xl border border-white/5 shadow-inner">
+                                <i class="fa-brands \${s.icon}"></i>
+                            </div>
+                            <span class="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">\${s.price} TL</span>
+                        </div>
+                        <span class="text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1 block">\${s.category}</span>
+                        <h3 class="text-base font-extrabold text-white mb-1.5">\${s.name}</h3>
+                        <p class="text-[11px] text-slate-400 mb-6 leading-relaxed">OnaylaSMS altyapısı ile anında numara tahsisi ve canlı SMS kod takibi.</p>
+                    </div>
+                    <button onclick='openOrderModal(\${JSON.stringify(s)})' class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                        <span>Satın Al</span>
+                    </button>
+                </div>
+            \`).join('');
+        }
+
+        function filterCategory(category) {
+            currentCategory = category;
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                if(btn.innerText.includes(category)) {
+                    btn.className = "cat-btn bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0";
+                } else {
+                    btn.className = "cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0";
+                }
+            });
+            filterServices();
+        }
+
+        function filterServices() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            let filtered = allServicesData;
+
+            if(currentCategory !== 'Tümü') {
+                filtered = filtered.filter(s => s.category === currentCategory);
+            }
+
+            if(query) {
+                filtered = filtered.filter(s => s.name.toLowerCase().includes(query) || s.category.toLowerCase().includes(query));
+            }
+
+            renderServices(filtered);
+        }
 
         let checkInterval = null;
 
@@ -720,7 +773,6 @@ app.get('/', (req, res) => {
                     document.getElementById('adm-user-count').innerText = json.usersCount;
                     document.getElementById('adm-dep-count').innerText = json.depositRequests.filter(d => d.status === 'Bekliyor').length;
 
-                    // Tablo doldur
                     const tbody = document.getElementById('adm-deposit-table');
                     tbody.innerHTML = json.depositRequests.map(d => \`
                         <tr class="border-b border-slate-800">
@@ -733,13 +785,12 @@ app.get('/', (req, res) => {
                             <td class="p-3 text-right space-x-1">
                                 \${d.status === 'Bekliyor' ? \`
                                     <button onclick="adminAction(\${d.id}, 'approve')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg font-bold">Onayla</button>
-                                    <button onclick="adminAction(\${d.id}, 'reject')" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg font-bold">Reddet</button>
+                                    <button onclick="adminAction(\th.id}, 'reject')" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg font-bold">Reddet</button>
                                 \` : '<span class="text-slate-500">Tamamlandı</span>'}
                             </td>
                         </tr>
                     \`).join('');
 
-                    // Ziyaretçiler
                     const vList = document.getElementById('adm-visitors-list');
                     vList.innerHTML = json.recentVisitors.map(v => \`
                         <div class="flex justify-between items-center bg-slate-950/40 p-2 rounded-xl">
