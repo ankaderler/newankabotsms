@@ -35,12 +35,12 @@ let visitorsCount = 0;
 let recentVisitors = [];
 let depositRequests = [];
 
-// SADECE İSTENEN ÜRÜNLER (WhatsApp TR, İngiltere, Filipinler ve Telegram TR)
+// YENİ FİYATLANDIRMA VE KATEGORİLER
 const ankaCatalog = [
-    { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 320, category: "WhatsApp", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
-    { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 240, category: "Telegram", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
-    { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 170, category: "WhatsApp", icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
-    { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 130, category: "WhatsApp", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" }
+    { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, category: "WhatsApp", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
+    { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 220, category: "Telegram", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
+    { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 200, category: "WhatsApp", icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
+    { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 150, category: "WhatsApp", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" }
 ];
 
 app.use((req, res, next) => {
@@ -438,12 +438,26 @@ app.get('/', (req, res) => {
 
         function filterCategory(cat) {
             currentCategory = cat;
-            renderServices(cat === 'Tümü' ? allServicesData : allServicesData.filter(s => s.category === cat));
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                if(btn.innerText.includes(cat)) {
+                    btn.className = "cat-btn bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0";
+                } else {
+                    btn.className = "cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0";
+                }
+            });
+            filterServices();
         }
 
         function filterServices() {
             const q = document.getElementById('search-input').value.toLowerCase();
-            renderServices(allServicesData.filter(s => s.name.toLowerCase().includes(q) && (currentCategory === 'Tümü' || s.category === currentCategory)));
+            let filtered = allServicesData;
+            if(currentCategory !== 'Tümü') {
+                filtered = filtered.filter(s => s.category === currentCategory);
+            }
+            if(q) {
+                filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
+            }
+            renderServices(filtered);
         }
 
         function openOrderModal(product) {
