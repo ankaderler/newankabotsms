@@ -1,417 +1,257 @@
-// AnkaSMS - tek dosya. Eksik paketleri ilk açılışta kendi kurar.
-// Gerekli ortam değişkenleri: API_KEY, DATABASE_URL, JWT_SECRET
-// İsteğe bağlı: ADMIN_EMAIL, COUNTRY, PAY_NAME, PAY_BANK, PAY_IBAN
-const { execSync } = require('child_process');
-const missing = ['bcryptjs', 'jsonwebtoken', 'helmet', 'express-rate-limit', 'pg', 'express', 'axios'].filter((m) => { try { require.resolve(m); return false; } catch { return true; } });
-if (missing.length) { console.log('Paketler kuruluyor:', missing.join(', ')); execSync('npm install --no-save --no-audit --no-fund ' + missing.join(' '), { stdio: 'inherit' }); }
-
 const express = require('express');
 const axios = require('axios');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const { Pool } = require('pg');
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const { API_KEY, DATABASE_URL, JWT_SECRET, ADMIN_EMAIL } = process.env;
-if (!API_KEY || !DATABASE_URL || !JWT_SECRET) { console.error('API_KEY, DATABASE_URL ve JWT_SECRET tanımlanmalı.'); process.exit(1); }
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Kodun içinde doğrudan tanımlandı, hata vermez
+const API_KEY = process.env.API_KEY || 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
 const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
-const COUNTRY = process.env.COUNTRY || '0';
-const TIMEOUT_MIN = 20;
 
-const PRODUCTS = {
-  wa: { name: 'WhatsApp', price: 200 },
-  tg: { name: 'Telegram', price: 200 },
-  lg: { name: 'Letgo', price: 80 }
+// Basit veritabanı simülasyonu
+let users = {
+    "musteri@gmail.com": { balance: 250.00, name: "Örnek Müşteri" }
 };
 
-const db = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
-const q = (t, p) => db.query(t, p);
+const servicePrices = {
+    "wa": 200,
+    "tg": 200,
+    "lg": 80
+};
 
-async function init() {
-  await q(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, hash TEXT NOT NULL, balance NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (balance >= 0), is_admin BOOLEAN DEFAULT FALSE)`);
-  await q(`CREATE TABLE IF NOT EXISTS activations (id SERIAL PRIMARY KEY, user_id INT NOT NULL, ext_id TEXT NOT NULL, service TEXT NOT NULL, phone TEXT, price NUMERIC(10,2) NOT NULL, status TEXT NOT NULL DEFAULT 'waiting', code TEXT, created_at TIMESTAMPTZ DEFAULT now())`);
-  await q(`CREATE TABLE IF NOT EXISTS deposits (id SERIAL PRIMARY KEY, user_id INT NOT NULL, sender TEXT NOT NULL, amount NUMERIC(10,2) NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT now())`);
-}
+app.get('/api/getCustomerBalance', (req, res) => {
+    const email = req.query.email || "musteri@gmail.com";
+    const user = users[email] || { balance: 0 };
+    res.json({ success: true, balance: user.balance });
+});
 
-const supplier = async (params) => String((await axios.get(API_URL, { params: { api_key: API_KEY, ...params }, timeout: 15000 })).data);
+app.post('/api/buyNumber', async (req, res) => {
+    const { service, country, email } = req.body;
+    const userEmail = email || "musteri@gmail.com";
+    
+    if (!users[userEmail]) {
+        return res.status(400).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+    }
 
-const app = express();
-app.set('trust proxy', 1);
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(express.json({ limit: '10kb' }));
-app.use('/api/', rateLimit({ windowMs: 60000, max: 60 }));
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60000, max: 20 }));
+    const price = servicePrices[service] || 100;
 
-const PAY = { name: process.env.PAY_NAME || 'AD SOYAD', bank: process.env.PAY_BANK || 'Banka / Papara', iban: process.env.PAY_IBAN || 'TR00 0000 0000 0000 0000 0000 00' };
-const PAGE = `<!DOCTYPE html>
+    if (users[userEmail].balance < price) {
+        return res.status(400).json({ 
+            success: false, 
+            message: `Bakiyeniz yetersiz! Bu ürün ${price} TL, sizin bakiyeniz ${users[userEmail].balance} TL. Lütfen bakiye yükleyin.` 
+        });
+    }
+
+    try {
+        const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getNumber&service=${service}&country=${country || 0}`);
+        const resultText = response.data;
+
+        if (resultText.startsWith('ACCESS_NUMBER')) {
+            users[userEmail].balance -= price;
+            const parts = resultText.split(':');
+            return res.json({
+                success: true,
+                activationId: parts[1],
+                phoneNumber: parts[2],
+                remainingBalance: users[userEmail].balance,
+                message: 'Numara başarıyla alındı!'
+            });
+        } else {
+            return res.status(400).json({ success: false, message: `Sistem hatası (Tedarikçi): ${resultText}` });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Sunucu bağlantı hatası.', error: error.message });
+    }
+});
+
+app.get('/api/checkSms/:activationId', async (req, res) => {
+    const { activationId } = req.params;
+    try {
+        const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getStatus&id=${activationId}`);
+        const resultText = response.data;
+
+        if (resultText.startsWith('STATUS_OK')) {
+            return res.json({ success: true, status: 'completed', code: resultText.split(':')[1] });
+        } else if (resultText === 'STATUS_WAIT_CODE') {
+            return res.json({ success: true, status: 'waiting', message: 'Kod bekleniyor...' });
+        } else {
+            return res.json({ success: true, status: resultText, message: resultText });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'SMS kontrol edilemedi.', error: error.message });
+    }
+});
+
+app.get('/', (req, res) => {
+    res.send(`<!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AnkaSMS</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Bricolage+Grotesque:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#0e0806;--panel:#1a100c;--line:#3a2118;--fire:#ff7a1a;--gold:#ffc857;--ink:#f7ede4;--mute:#a58f80;--ok:#7be0a2;--bad:#ff6b5e}
-*{box-sizing:border-box;margin:0}
-body{font-family:'Bricolage Grotesque',sans-serif;background:radial-gradient(90% 60% at 50% 0,#2a1208,var(--bg));color:var(--ink);min-height:100vh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-h1,h2,.brand{font-family:'Fraunces',serif}
-button,input{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.hide{display:none!important}
-/* Açılış */
-#intro{position:fixed;inset:0;z-index:99;background:var(--bg);display:grid;place-items:center;animation:introOut .8s 3.6s forwards}
-#intro .stage{text-align:center}
-#phoenix{width:min(60vw,260px);filter:drop-shadow(0 0 28px #ff7a1a99);animation:rise 2.4s cubic-bezier(.2,.8,.2,1) both}
-.wing{transform-origin:100px 105px;animation:flap .7s ease-in-out infinite alternate}
-.wing.r{animation-delay:.02s;transform:scaleX(-1) translateX(-200px)}
-.wing.r{animation:none}
-.tail path{transform-origin:100px 130px;animation:sway 1.1s ease-in-out infinite alternate}
-.tail path:nth-child(2){animation-delay:.25s}.tail path:nth-child(3){animation-delay:.5s}
-#intro .brand{font-size:clamp(38px,9vw,64px);letter-spacing:.02em;background:linear-gradient(#ffe29a,#ff7a1a);-webkit-background-clip:text;background-clip:text;color:transparent;animation:fadeIn 1s 1.6s both}
-#intro p{color:var(--mute);animation:fadeIn 1s 2.2s both}
-@keyframes rise{from{transform:translateY(120px) scale(.6);opacity:0}to{transform:none;opacity:1}}
-@keyframes flap{from{transform:rotate(-18deg) scaleY(.85)}to{transform:rotate(14deg) scaleY(1.05)}}
-@keyframes sway{from{transform:rotate(-8deg) scaleY(.9)}to{transform:rotate(8deg) scaleY(1.12)}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@keyframes introOut{to{opacity:0;visibility:hidden}}
-@media (prefers-reduced-motion:reduce){#intro{animation-duration:.01s;animation-delay:.6s}#phoenix,.wing,.tail path,#intro .brand,#intro p{animation:none}}
-/* Genel */
-.wrap{max-width:880px;margin:0 auto;padding:20px 16px 48px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}
-.btn{background:linear-gradient(135deg,var(--fire),#e8540c);border:0;border-radius:12px;padding:12px 18px;font-weight:700;cursor:pointer;color:#1a0a03}
-.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
-.btn:disabled{opacity:.5;cursor:wait}
-input{width:100%;background:#120a07;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:6px}
-label{display:block;font-size:13px;color:var(--mute);margin-top:14px}
-.tabs{display:flex;gap:8px;margin-bottom:6px}.tabs button{flex:1}
-.msg{min-height:20px;font-size:14px;margin-top:12px;color:var(--bad)}.msg.ok{color:var(--ok)}
-#auth{max-width:420px;margin:8vh auto 0}
-#auth h2{font-size:30px;margin-bottom:4px}
-/* Panel */
-header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px}
-header .brand{font-size:26px;color:var(--gold)}
-.bal{display:flex;align-items:center;gap:10px}.bal b{font-size:20px;color:var(--gold)}
-.box{border:1px solid var(--line);border-radius:22px;padding:22px;background:#150c09}
-.box h2{font-size:22px;margin-bottom:16px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
-.prod{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px;text-align:left}
-.prod .n{font-size:18px;font-weight:700}.prod .p{font-family:'Fraunces',serif;font-size:28px;color:var(--gold)}
-.prod .btn{margin-top:auto}
-#active{margin-top:20px}
-.code{font-family:'Fraunces',serif;font-size:42px;letter-spacing:.12em;color:var(--gold)}
-.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
-.row:first-child{border-top:0}.st-done{color:var(--ok)}.st-cancelled{color:var(--mute)}.st-waiting{color:var(--gold)}
-#dep{position:fixed;inset:0;background:#000b;display:grid;place-items:center;padding:16px;z-index:50}
-#dep .card{width:100%;max-width:420px}
-.pay{background:#120a07;border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14px;margin:12px 0;line-height:1.7}
-.pay b{color:var(--gold);word-break:break-all}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnkaSMS - Müşteri Paneli</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f3f4f6; }
+        .glass { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.2); }
+    </style>
 </head>
-<body>
-
-<div id="intro" aria-hidden="true">
-  <div class="stage">
-    <svg id="phoenix" viewBox="0 0 200 200">
-      <defs>
-        <linearGradient id="fg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe29a"/><stop offset=".55" stop-color="#ff7a1a"/><stop offset="1" stop-color="#b3260a"/></linearGradient>
-      </defs>
-      <g class="tail">
-        <path d="M100 128 C70 150 60 180 78 196 C82 170 96 158 100 128Z" fill="url(#fg)"/>
-        <path d="M100 128 C96 160 100 182 100 198 C106 182 108 160 100 128Z" fill="#ffc857"/>
-        <path d="M100 128 C130 150 140 180 122 196 C118 170 104 158 100 128Z" fill="url(#fg)"/>
-      </g>
-      <g class="wing"><path d="M98 100 C60 60 20 62 4 40 C24 92 56 122 98 118Z" fill="url(#fg)"/></g>
-      <g style="transform-origin:100px 105px;transform:scaleX(-1) translateX(-200px)"><g class="wing"><path d="M98 100 C60 60 20 62 4 40 C24 92 56 122 98 118Z" fill="url(#fg)"/></g></g>
-      <ellipse cx="100" cy="108" rx="14" ry="28" fill="url(#fg)"/>
-      <circle cx="100" cy="70" r="12" fill="#ffc857"/>
-      <path d="M100 58 C96 44 104 38 108 30 C112 42 108 50 100 58Z" fill="#ff7a1a"/>
-      <path d="M110 70 L124 74 L110 78Z" fill="#b3260a"/>
-      <circle cx="104" cy="68" r="2" fill="#1a0a03"/>
-    </svg>
-    <div class="brand">AnkaSMS</div>
-    <p>Küllerinden doğan hız.</p>
-  </div>
-</div>
-
-<main class="wrap">
-  <section id="auth" class="card hide">
-    <h2>AnkaSMS</h2>
-    <div class="tabs">
-      <button class="btn" id="tab-in" type="button">Giriş yap</button>
-      <button class="btn ghost" id="tab-up" type="button">Kayıt ol</button>
-    </div>
-    <div id="f-name" class="hide"><label for="name">Adınız</label><input id="name" autocomplete="name"></div>
-    <label for="email">E-posta</label><input id="email" type="email" autocomplete="email">
-    <label for="pass">Şifre (en az 8 karakter)</label><input id="pass" type="password" autocomplete="current-password">
-    <div class="msg" id="auth-msg" role="alert"></div>
-    <button class="btn" id="auth-go" type="button" style="width:100%;margin-top:6px">Giriş yap</button>
-  </section>
-
-  <section id="app" class="hide">
-    <header>
-      <div class="brand">AnkaSMS</div>
-      <div class="bal">
-        <span>Bakiye <b id="bal">0.00 TL</b></span>
-        <button class="btn" id="open-dep" type="button">Bakiye yükle</button>
-        <button class="btn ghost" id="out" type="button">Çıkış</button>
-      </div>
+<body class="min-h-screen flex flex-col justify-between">
+    <header class="glass sticky top-0 z-40 border-b border-blue-900/30 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-blue-600/20 border border-blue-500/40 rounded-xl flex items-center justify-center">
+                <i class="fa-solid fa-bolt text-blue-400"></i>
+            </div>
+            <div>
+                <span class="font-bold text-lg tracking-tight text-white">AnkaSMS</span>
+                <span class="block text-[10px] text-blue-400 font-medium">MÜŞTERİ PANELİ</span>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <div class="glass px-3 py-1.5 rounded-xl flex items-center space-x-2 text-sm border-blue-500/20">
+                <i class="fa-solid fa-wallet text-emerald-400"></i>
+                <span class="text-slate-400">Bakiyeniz:</span>
+                <span id="customer-balance" class="font-bold text-emerald-400">Yükleniyor...</span>
+            </div>
+            <button onclick="openDepositModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-blue-600/20">
+                <i class="fa-solid fa-plus mr-1"></i> Bakiye Yükle
+            </button>
+        </div>
     </header>
 
-    <div class="box">
-      <h2>Numara al</h2>
-      <div class="grid" id="products"></div>
-      <div class="msg" id="buy-msg" role="alert"></div>
-      <div id="active" class="card hide">
-        <div style="color:var(--mute);font-size:14px">Numaranız</div>
-        <div id="a-phone" style="font-size:22px;font-weight:700;margin:2px 0 14px"></div>
-        <div style="color:var(--mute);font-size:14px">SMS kodu</div>
-        <div class="code" id="a-code">Bekleniyor…</div>
-        <button class="btn ghost" id="a-cancel" type="button" style="margin-top:14px">İptal et ve iade al</button>
-      </div>
+    <main class="max-w-4xl mx-auto px-4 py-8 w-full flex-grow">
+        <div class="glass p-6 rounded-2xl mb-8 border border-blue-500/30">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-cart-shopping text-blue-500"></i>
+                <span>Hızlı Numara Satın Al</span>
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Servis Seçin</label>
+                    <select id="service-select" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2.5 text-xs text-white">
+                        <option value="wa">WhatsApp - 200 TL</option>
+                        <option value="tg">Telegram - 200 TL</option>
+                        <option value="lg">Letgo TR SMS - 80 TL</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Ülke Kodu</label>
+                    <input type="text" id="country-input" value="0" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2.5 text-xs text-white" placeholder="Örn: 0">
+                </div>
+            </div>
+            <button onclick="buyNumber()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg shadow-blue-600/20">
+                Numara Satın Al ve Kodu Bekle
+            </button>
+        </div>
+
+        <div id="result-box" class="hidden glass p-6 rounded-2xl border border-emerald-500/30">
+            <h3 class="text-lg font-bold text-emerald-400 mb-2"><i class="fa-solid fa-circle-check"></i> Numara Tahsis Edildi</h3>
+            <p class="text-xs text-slate-300 mb-2">Telefon Numaranız: <b id="res-phone" class="text-white text-sm font-mono"></b></p>
+            <p class="text-xs text-slate-300 mb-4">İşlem ID: <span id="res-id" class="font-mono text-slate-400"></span></p>
+            
+            <div class="bg-slate-900/80 p-4 rounded-xl border border-blue-500/20">
+                <span class="text-xs text-slate-400 block mb-1">Gelen SMS Kodu:</span>
+                <div id="res-code" class="text-2xl font-extrabold text-blue-400 font-mono">Kod bekleniyor...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bakiye Yükleme Modalı (Arda Sakla Adına Ödeme) -->
+    <div id="deposit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass w-full max-w-md rounded-2xl p-6 border border-blue-500/30 relative">
+            <button onclick="closeDepositModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <h3 class="text-lg font-bold text-white mb-2"><i class="fa-solid fa-wallet text-blue-500"></i> Bakiye Yükleme Bilgileri</h3>
+            <p class="text-xs text-slate-400 mb-4">Aşağıdaki hesaba ödeme yaptıktan sonra bildirim gönderin:</p>
+            
+            <div class="bg-slate-900/90 p-4 rounded-xl border border-blue-500/30 mb-4 space-y-2 text-xs">
+                <div class="flex justify-between"><span class="text-slate-400">Alıcı Ad Soyad:</span> <span class="font-bold text-emerald-400 text-sm">Arda Sakla</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Banka / Papara:</span> <span class="font-semibold text-white">Papara / Ziraat Bankası</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">IBAN / Papara No:</span> <span class="font-mono text-blue-300 font-bold">TR36 0001 0020 3040 5060 7080 90</span></div>
+            </div>
+
+            <div class="space-y-3">
+                <input type="text" id="dep-name" placeholder="Gönderen Adınız Soyadınız" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2 text-xs text-white">
+                <input type="number" id="dep-amount" placeholder="Yatırılan Tutar (TL)" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2 text-xs text-white">
+                <button onclick="sendDepositNotice()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs transition">Ödeme Bildirimi Gönder</button>
+            </div>
+        </div>
     </div>
 
-    <div class="box" style="margin-top:18px">
-      <h2>Son işlemler</h2>
-      <div id="history"></div>
-    </div>
+    <script>
+        async function fetchBalance() {
+            try {
+                const res = await fetch('/api/getCustomerBalance');
+                const json = await res.json();
+                if(json.success) {
+                    document.getElementById('customer-balance').innerText = json.balance.toFixed(2) + ' TL';
+                }
+            } catch(e) { console.error(e); }
+        }
+        fetchBalance();
 
-    <div class="box hide" id="admin" style="margin-top:18px">
-      <h2>Bekleyen ödemeler</h2>
-      <div id="deposits"></div>
-    </div>
-  </section>
-</main>
+        let checkInterval = null;
 
-<div id="dep" class="hide">
-  <div class="card">
-    <h2 style="font-size:22px">Bakiye yükle</h2>
-    <div class="pay">
-      Alıcı: <b id="pay-name"></b><br>
-      Banka: <b id="pay-bank"></b><br>
-      IBAN / Papara no: <b id="pay-iban"></b>
-    </div>
-    <label for="d-sender">Gönderen ad soyad</label><input id="d-sender">
-    <label for="d-amount">Tutar (TL)</label><input id="d-amount" type="number" min="10">
-    <div class="msg" id="d-msg" role="alert"></div>
-    <div style="display:flex;gap:8px;margin-top:6px">
-      <button class="btn" id="d-send" type="button" style="flex:1">Ödemeyi bildir</button>
-      <button class="btn ghost" id="d-close" type="button">Kapat</button>
-    </div>
-  </div>
-</div>
+        async function buyNumber() {
+            const service = document.getElementById('service-select').value;
+            const country = document.getElementById('country-input').value;
 
-<script>
-const PAY = __PAY__;
+            alert('Numara talep ediliyor, lütfen bekleyin...');
+            
+            try {
+                const res = await fetch('/api/buyNumber', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ service, country, email: 'musteri@gmail.com' })
+                });
+                const json = await res.json();
 
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-let mode = 'in', poll = null, me = null;
+                if(json.success) {
+                    document.getElementById('result-box').classList.remove('hidden');
+                    document.getElementById('res-phone').innerText = json.phoneNumber;
+                    document.getElementById('res-id').innerText = json.activationId;
+                    
+                    document.getElementById('customer-balance').innerText = json.remainingBalance.toFixed(2) + ' TL';
 
-async function api(path, opts = {}) {
-  const t = localStorage.getItem('t');
-  const r = await fetch('/api/' + path, { ...opts, headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: 'Bearer ' + t } : {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined });
-  const j = await r.json().catch(() => ({}));
-  if (r.status === 401 && t) { logout(); }
-  if (!r.ok) throw new Error(j.message || 'Bir hata oluştu.');
-  return j;
-}
-function setMsg(id, text, ok) { const e = $(id); e.textContent = text || ''; e.className = 'msg' + (ok ? ' ok' : ''); }
+                    if(checkInterval) clearInterval(checkInterval);
+                    checkInterval = setInterval(() => checkSmsCode(json.activationId), 3000);
+                } else {
+                    alert('Hata: ' + json.message);
+                }
+            } catch(e) {
+                alert('Bağlantı hatası oluştu!');
+            }
+        }
 
-function setMode(m) {
-  mode = m;
-  $('f-name').classList.toggle('hide', m === 'in');
-  $('tab-in').className = 'btn' + (m === 'in' ? '' : ' ghost');
-  $('tab-up').className = 'btn' + (m === 'up' ? '' : ' ghost');
-  $('auth-go').textContent = m === 'in' ? 'Giriş yap' : 'Hesap oluştur';
-  $('pass').autocomplete = m === 'in' ? 'current-password' : 'new-password';
-  setMsg('auth-msg');
-}
-$('tab-in').onclick = () => setMode('in');
-$('tab-up').onclick = () => setMode('up');
+        async function checkSmsCode(activationId) {
+            try {
+                const res = await fetch(\`/api/checkSms/\${activationId}\`);
+                const json = await res.json();
 
-$('auth-go').onclick = async () => {
-  const b = $('auth-go'); b.disabled = true;
-  try {
-    const body = { email: $('email').value, password: $('pass').value, name: $('name').value };
-    const j = await api(mode === 'in' ? 'auth/login' : 'auth/register', { method: 'POST', body });
-    localStorage.setItem('t', j.token);
-    await load();
-  } catch (e) { setMsg('auth-msg', e.message); }
-  b.disabled = false;
-};
+                if(json.success && json.status === 'completed') {
+                    document.getElementById('res-code').innerText = json.code;
+                    clearInterval(checkInterval);
+                    alert('SMS Kodu başarıyla geldi!');
+                }
+            } catch(e) { console.error(e); }
+        }
 
-function logout() { localStorage.removeItem('t'); clearInterval(poll); $('app').classList.add('hide'); $('auth').classList.remove('hide'); }
-$('out').onclick = logout;
-
-async function load() {
-  me = await api('me');
-  $('auth').classList.add('hide'); $('app').classList.remove('hide');
-  $('bal').textContent = me.balance.toFixed(2) + ' TL';
-  $('products').innerHTML = Object.entries(me.products).map(([k, p]) =>
-    \`<div class="prod"><div class="n">\${esc(p.name)}</div><div class="p">\${p.price} TL</div><button class="btn" data-s="\${esc(k)}" type="button">Numara al</button></div>\`).join('');
-  document.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => buy(b.dataset.s, b));
-  const label = { waiting: 'Bekliyor', done: 'Tamamlandı', cancelled: 'İptal, iade edildi' };
-  $('history').innerHTML = me.activations.length ? me.activations.map((a) =>
-    \`<div class="row"><span>\${esc(me.products[a.service]?.name || a.service)} · \${esc(a.phone || '')}</span><span class="st-\${esc(a.status)}">\${label[a.status] || esc(a.status)}\${a.code ? ' · ' + esc(a.code) : ''}</span></div>\`).join('')
-    : '<p style="color:var(--mute)">Henüz işlem yok. Yukarıdan bir ürün seçin.</p>';
-  if (me.is_admin) { $('admin').classList.remove('hide'); loadDeposits(); }
-}
-
-async function buy(service, btn) {
-  btn.disabled = true; setMsg('buy-msg');
-  try {
-    const r = await api('buy', { method: 'POST', body: { service } });
-    $('bal').textContent = r.balance.toFixed(2) + ' TL';
-    $('a-phone').textContent = r.phone; $('a-code').textContent = 'Bekleniyor…';
-    $('active').classList.remove('hide');
-    $('a-cancel').onclick = async () => { await api('cancel/' + r.id, { method: 'POST' }); clearInterval(poll); $('active').classList.add('hide'); setMsg('buy-msg', 'İptal edildi, ücret iade edildi.', true); load(); };
-    clearInterval(poll);
-    poll = setInterval(async () => {
-      try {
-        const s = await api('check/' + r.id);
-        if (s.status === 'done') { $('a-code').textContent = s.code; clearInterval(poll); load(); }
-        else if (s.status === 'cancelled') { clearInterval(poll); $('active').classList.add('hide'); setMsg('buy-msg', 'Kod gelmedi. Ücret iade edildi.', true); load(); }
-      } catch (e) { /* geçici hata, tekrar denenecek */ }
-    }, 4000);
-  } catch (e) { setMsg('buy-msg', e.message); }
-  btn.disabled = false;
-}
-
-$('open-dep').onclick = () => { $('pay-name').textContent = PAY.name; $('pay-bank').textContent = PAY.bank; $('pay-iban').textContent = PAY.iban; setMsg('d-msg'); $('dep').classList.remove('hide'); };
-$('d-close').onclick = () => $('dep').classList.add('hide');
-$('d-send').onclick = async () => {
-  try {
-    const j = await api('deposit', { method: 'POST', body: { sender: $('d-sender').value, amount: $('d-amount').value } });
-    setMsg('d-msg', j.message, true);
-  } catch (e) { setMsg('d-msg', e.message); }
-};
-
-async function loadDeposits() {
-  const rows = await api('admin/deposits');
-  $('deposits').innerHTML = rows.length ? rows.map((d) =>
-    \`<div class="row"><span>\${esc(d.sender)} · \${esc(d.email)} · \${Number(d.amount).toFixed(2)} TL</span><button class="btn" data-d="\${d.id}" type="button">Onayla</button></div>\`).join('')
-    : '<p style="color:var(--mute)">Bekleyen ödeme yok.</p>';
-  document.querySelectorAll('[data-d]').forEach((b) => b.onclick = async () => { await api('admin/deposits/' + b.dataset.d + '/approve', { method: 'POST' }); loadDeposits(); });
-}
-
-// Açılış animasyonu bitince giriş ekranı ya da panel
-setTimeout(() => { $('intro').remove(); localStorage.getItem('t') ? load().catch(logout) : $('auth').classList.remove('hide'); }, 4400);
-</script>
+        function openDepositModal() { document.getElementById('deposit-modal').classList.remove('hidden'); }
+        function closeDepositModal() { document.getElementById('deposit-modal').classList.add('hidden'); }
+        function sendDepositNotice() {
+            const name = document.getElementById('dep-name').value;
+            const amount = document.getElementById('dep-amount').value;
+            if(!name || !amount) { alert('Lütfen alanları doldurun.'); return; }
+            alert('Ödeme bildiriminiz Arda Sakla adına alınmıştır. Admin onayından sonra bakiyeniz eklenecektir.');
+            closeDepositModal();
+        }
+    </script>
 </body>
-</html>
-`;
-app.get('/', (req, res) => res.type('html').send(PAGE.replace('__PAY__', JSON.stringify(PAY))));
+</html>`);
+});
 
-const wrap = (fn) => (req, res) => fn(req, res).catch((e) => { console.error(e.message); res.status(500).json({ message: 'Sunucu hatası. Biraz sonra tekrar deneyin.' }); });
-
-function auth(req, res, next) {
-  try {
-    req.uid = jwt.verify((req.headers.authorization || '').replace('Bearer ', ''), JWT_SECRET).uid;
-    next();
-  } catch { res.status(401).json({ message: 'Oturum süresi doldu. Tekrar giriş yapın.' }); }
-}
-async function admin(req, res, next) {
-  const { rows } = await q('SELECT is_admin FROM users WHERE id=$1', [req.uid]);
-  if (!rows[0]?.is_admin) return res.status(403).json({ message: 'Yetkiniz yok.' });
-  next();
-}
-const token = (uid) => jwt.sign({ uid }, JWT_SECRET, { expiresIn: '7d' });
-
-app.post('/api/auth/register', wrap(async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !/^\S+@\S+\.\S+$/.test(email || '') || (password || '').length < 8)
-    return res.status(400).json({ message: 'Ad, geçerli bir e-posta ve en az 8 karakterli şifre girin.' });
-  const isAdmin = !!ADMIN_EMAIL && email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  try {
-    const { rows } = await q('INSERT INTO users(email,name,hash,is_admin) VALUES($1,$2,$3,$4) RETURNING id', [email.toLowerCase(), name.trim().slice(0, 60), await bcrypt.hash(password, 10), isAdmin]);
-    res.json({ token: token(rows[0].id) });
-  } catch (e) {
-    if (e.code === '23505') return res.status(409).json({ message: 'Bu e-posta zaten kayıtlı. Giriş yapın.' });
-    throw e;
-  }
-}));
-
-app.post('/api/auth/login', wrap(async (req, res) => {
-  const { email, password } = req.body;
-  const { rows } = await q('SELECT * FROM users WHERE email=$1', [String(email || '').toLowerCase()]);
-  if (!rows[0] || !(await bcrypt.compare(String(password || ''), rows[0].hash)))
-    return res.status(401).json({ message: 'E-posta veya şifre hatalı.' });
-  res.json({ token: token(rows[0].id) });
-}));
-
-app.get('/api/me', auth, wrap(async (req, res) => {
-  const { rows } = await q('SELECT name,email,balance,is_admin FROM users WHERE id=$1', [req.uid]);
-  const acts = await q('SELECT id,service,phone,price,status,code,created_at FROM activations WHERE user_id=$1 ORDER BY id DESC LIMIT 10', [req.uid]);
-  res.json({ ...rows[0], balance: Number(rows[0].balance), products: PRODUCTS, activations: acts.rows });
-}));
-
-app.post('/api/buy', auth, wrap(async (req, res) => {
-  const p = PRODUCTS[req.body.service];
-  if (!p) return res.status(400).json({ message: 'Geçersiz ürün.' });
-  // Atomik düşüm: bakiye yetersizse satır güncellenmez
-  const paid = await q('UPDATE users SET balance=balance-$1 WHERE id=$2 AND balance>=$1 RETURNING balance', [p.price, req.uid]);
-  if (!paid.rows[0]) return res.status(400).json({ message: `Bakiye yetersiz. ${p.name} ${p.price} TL. Bakiye yükleyin.` });
-  const refund = () => q('UPDATE users SET balance=balance+$1 WHERE id=$2', [p.price, req.uid]);
-  try {
-    const out = await supplier({ action: 'getNumber', service: req.body.service, country: COUNTRY });
-    if (!out.startsWith('ACCESS_NUMBER')) { await refund(); return res.status(400).json({ message: 'Şu an bu ürün için numara yok. Ücret iade edildi.' }); }
-    const [, extId, phone] = out.split(':');
-    const a = await q('INSERT INTO activations(user_id,ext_id,service,phone,price) VALUES($1,$2,$3,$4,$5) RETURNING id', [req.uid, extId, req.body.service, phone, p.price]);
-    res.json({ id: a.rows[0].id, phone, balance: Number(paid.rows[0].balance) });
-  } catch (e) { await refund(); throw e; }
-}));
-
-// Bir kez iptal + iade (tekrar çağrılırsa çift iade olmaz)
-async function cancelAndRefund(a) {
-  const c = await q("UPDATE activations SET status='cancelled' WHERE id=$1 AND status='waiting' RETURNING id", [a.id]);
-  if (!c.rows[0]) return false;
-  await supplier({ action: 'setStatus', id: a.ext_id, status: 8 }).catch(() => {});
-  await q('UPDATE users SET balance=balance+$1 WHERE id=$2', [a.price, a.user_id]);
-  return true;
-}
-
-app.get('/api/check/:id', auth, wrap(async (req, res) => {
-  const { rows } = await q('SELECT * FROM activations WHERE id=$1 AND user_id=$2', [Number(req.params.id) || 0, req.uid]);
-  const a = rows[0];
-  if (!a) return res.status(404).json({ message: 'İşlem bulunamadı.' });
-  if (a.status !== 'waiting') return res.json({ status: a.status, code: a.code });
-  const out = await supplier({ action: 'getStatus', id: a.ext_id });
-  if (out.startsWith('STATUS_OK')) {
-    const code = out.split(':')[1];
-    await q("UPDATE activations SET status='done', code=$1 WHERE id=$2", [code, a.id]);
-    return res.json({ status: 'done', code });
-  }
-  if (Date.now() - new Date(a.created_at) > TIMEOUT_MIN * 60000) {
-    await cancelAndRefund(a);
-    return res.json({ status: 'cancelled' });
-  }
-  res.json({ status: 'waiting' });
-}));
-
-app.post('/api/cancel/:id', auth, wrap(async (req, res) => {
-  const { rows } = await q('SELECT * FROM activations WHERE id=$1 AND user_id=$2', [Number(req.params.id) || 0, req.uid]);
-  if (!rows[0]) return res.status(404).json({ message: 'İşlem bulunamadı.' });
-  res.json({ refunded: await cancelAndRefund(rows[0]) });
-}));
-
-app.post('/api/deposit', auth, wrap(async (req, res) => {
-  const amount = Number(req.body.amount), sender = String(req.body.sender || '').trim().slice(0, 80);
-  if (!sender || !(amount >= 10 && amount <= 50000)) return res.status(400).json({ message: 'Gönderen adı ve 10-50000 TL arası tutar girin.' });
-  await q('INSERT INTO deposits(user_id,sender,amount) VALUES($1,$2,$3)', [req.uid, sender, amount]);
-  res.json({ message: 'Bildirim alındı. Ödeme kontrol edilince bakiyeniz eklenecek.' });
-}));
-
-app.get('/api/admin/deposits', auth, admin, wrap(async (req, res) => {
-  const { rows } = await q("SELECT d.id,d.sender,d.amount,d.created_at,u.email FROM deposits d JOIN users u ON u.id=d.user_id WHERE d.status='pending' ORDER BY d.id");
-  res.json(rows);
-}));
-
-app.post('/api/admin/deposits/:id/approve', auth, admin, wrap(async (req, res) => {
-  const d = await q("UPDATE deposits SET status='approved' WHERE id=$1 AND status='pending' RETURNING user_id,amount", [Number(req.params.id) || 0]);
-  if (!d.rows[0]) return res.status(404).json({ message: 'Bekleyen bildirim yok.' });
-  await q('UPDATE users SET balance=balance+$1 WHERE id=$2', [d.rows[0].amount, d.rows[0].user_id]);
-  res.json({ ok: true });
-}));
-
-init().then(() => app.listen(process.env.PORT || 3000, () => console.log('AnkaSMS çalışıyor'))).catch((e) => { console.error(e); process.exit(1); });
+app.listen(PORT, () => {
+    console.log('Sunucu calisiyor, port:', PORT);
+});
