@@ -1,1 +1,257 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AnkaSMS</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Bricolage+Grotesque:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e0806;--panel:#1a100c;--line:#3a2118;--fire:#ff7a1a;--gold:#ffc857;--ink:#f7ede4;--mute:#a58f80;--ok:#7be0a2;--bad:#ff6b5e}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Bricolage Grotesque',sans-serif;background:radial-gradient(90% 60% at 50% 0,#2a1208,var(--bg));color:var(--ink);min-height:100vh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+h1,h2,.brand{font-family:'Fraunces',serif}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.hide{display:none!important}
+/* Açılış */
+#intro{position:fixed;inset:0;z-index:99;background:var(--bg);display:grid;place-items:center;animation:introOut .8s 3.6s forwards}
+#intro .stage{text-align:center}
+#phoenix{width:min(60vw,260px);filter:drop-shadow(0 0 28px #ff7a1a99);animation:rise 2.4s cubic-bezier(.2,.8,.2,1) both}
+.wing{transform-origin:100px 105px;animation:flap .7s ease-in-out infinite alternate}
+.wing.r{animation-delay:.02s;transform:scaleX(-1) translateX(-200px)}
+.wing.r{animation:none}
+.tail path{transform-origin:100px 130px;animation:sway 1.1s ease-in-out infinite alternate}
+.tail path:nth-child(2){animation-delay:.25s}.tail path:nth-child(3){animation-delay:.5s}
+#intro .brand{font-size:clamp(38px,9vw,64px);letter-spacing:.02em;background:linear-gradient(#ffe29a,#ff7a1a);-webkit-background-clip:text;background-clip:text;color:transparent;animation:fadeIn 1s 1.6s both}
+#intro p{color:var(--mute);animation:fadeIn 1s 2.2s both}
+@keyframes rise{from{transform:translateY(120px) scale(.6);opacity:0}to{transform:none;opacity:1}}
+@keyframes flap{from{transform:rotate(-18deg) scaleY(.85)}to{transform:rotate(14deg) scaleY(1.05)}}
+@keyframes sway{from{transform:rotate(-8deg) scaleY(.9)}to{transform:rotate(8deg) scaleY(1.12)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes introOut{to{opacity:0;visibility:hidden}}
+@media (prefers-reduced-motion:reduce){#intro{animation-duration:.01s;animation-delay:.6s}#phoenix,.wing,.tail path,#intro .brand,#intro p{animation:none}}
+/* Genel */
+.wrap{max-width:880px;margin:0 auto;padding:20px 16px 48px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}
+.btn{background:linear-gradient(135deg,var(--fire),#e8540c);border:0;border-radius:12px;padding:12px 18px;font-weight:700;cursor:pointer;color:#1a0a03}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:wait}
+input{width:100%;background:#120a07;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:6px}
+label{display:block;font-size:13px;color:var(--mute);margin-top:14px}
+.tabs{display:flex;gap:8px;margin-bottom:6px}.tabs button{flex:1}
+.msg{min-height:20px;font-size:14px;margin-top:12px;color:var(--bad)}.msg.ok{color:var(--ok)}
+#auth{max-width:420px;margin:8vh auto 0}
+#auth h2{font-size:30px;margin-bottom:4px}
+/* Panel */
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+header .brand{font-size:26px;color:var(--gold)}
+.bal{display:flex;align-items:center;gap:10px}.bal b{font-size:20px;color:var(--gold)}
+.box{border:1px solid var(--line);border-radius:22px;padding:22px;background:#150c09}
+.box h2{font-size:22px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.prod{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px;text-align:left}
+.prod .n{font-size:18px;font-weight:700}.prod .p{font-family:'Fraunces',serif;font-size:28px;color:var(--gold)}
+.prod .btn{margin-top:auto}
+#active{margin-top:20px}
+.code{font-family:'Fraunces',serif;font-size:42px;letter-spacing:.12em;color:var(--gold)}
+.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.row:first-child{border-top:0}.st-done{color:var(--ok)}.st-cancelled{color:var(--mute)}.st-waiting{color:var(--gold)}
+#dep{position:fixed;inset:0;background:#000b;display:grid;place-items:center;padding:16px;z-index:50}
+#dep .card{width:100%;max-width:420px}
+.pay{background:#120a07;border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14px;margin:12px 0;line-height:1.7}
+.pay b{color:var(--gold);word-break:break-all}
+</style>
+</head>
+<body>
 
+<div id="intro" aria-hidden="true">
+  <div class="stage">
+    <svg id="phoenix" viewBox="0 0 200 200">
+      <defs>
+        <linearGradient id="fg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe29a"/><stop offset=".55" stop-color="#ff7a1a"/><stop offset="1" stop-color="#b3260a"/></linearGradient>
+      </defs>
+      <g class="tail">
+        <path d="M100 128 C70 150 60 180 78 196 C82 170 96 158 100 128Z" fill="url(#fg)"/>
+        <path d="M100 128 C96 160 100 182 100 198 C106 182 108 160 100 128Z" fill="#ffc857"/>
+        <path d="M100 128 C130 150 140 180 122 196 C118 170 104 158 100 128Z" fill="url(#fg)"/>
+      </g>
+      <g class="wing"><path d="M98 100 C60 60 20 62 4 40 C24 92 56 122 98 118Z" fill="url(#fg)"/></g>
+      <g style="transform-origin:100px 105px;transform:scaleX(-1) translateX(-200px)"><g class="wing"><path d="M98 100 C60 60 20 62 4 40 C24 92 56 122 98 118Z" fill="url(#fg)"/></g></g>
+      <ellipse cx="100" cy="108" rx="14" ry="28" fill="url(#fg)"/>
+      <circle cx="100" cy="70" r="12" fill="#ffc857"/>
+      <path d="M100 58 C96 44 104 38 108 30 C112 42 108 50 100 58Z" fill="#ff7a1a"/>
+      <path d="M110 70 L124 74 L110 78Z" fill="#b3260a"/>
+      <circle cx="104" cy="68" r="2" fill="#1a0a03"/>
+    </svg>
+    <div class="brand">AnkaSMS</div>
+    <p>Küllerinden doğan hız.</p>
+  </div>
+</div>
+
+<main class="wrap">
+  <section id="auth" class="card hide">
+    <h2>AnkaSMS</h2>
+    <div class="tabs">
+      <button class="btn" id="tab-in" type="button">Giriş yap</button>
+      <button class="btn ghost" id="tab-up" type="button">Kayıt ol</button>
+    </div>
+    <div id="f-name" class="hide"><label for="name">Adınız</label><input id="name" autocomplete="name"></div>
+    <label for="email">E-posta</label><input id="email" type="email" autocomplete="email">
+    <label for="pass">Şifre (en az 8 karakter)</label><input id="pass" type="password" autocomplete="current-password">
+    <div class="msg" id="auth-msg" role="alert"></div>
+    <button class="btn" id="auth-go" type="button" style="width:100%;margin-top:6px">Giriş yap</button>
+  </section>
+
+  <section id="app" class="hide">
+    <header>
+      <div class="brand">AnkaSMS</div>
+      <div class="bal">
+        <span>Bakiye <b id="bal">0.00 TL</b></span>
+        <button class="btn" id="open-dep" type="button">Bakiye yükle</button>
+        <button class="btn ghost" id="out" type="button">Çıkış</button>
+      </div>
+    </header>
+
+    <div class="box">
+      <h2>Numara al</h2>
+      <div class="grid" id="products"></div>
+      <div class="msg" id="buy-msg" role="alert"></div>
+      <div id="active" class="card hide">
+        <div style="color:var(--mute);font-size:14px">Numaranız</div>
+        <div id="a-phone" style="font-size:22px;font-weight:700;margin:2px 0 14px"></div>
+        <div style="color:var(--mute);font-size:14px">SMS kodu</div>
+        <div class="code" id="a-code">Bekleniyor…</div>
+        <button class="btn ghost" id="a-cancel" type="button" style="margin-top:14px">İptal et ve iade al</button>
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:18px">
+      <h2>Son işlemler</h2>
+      <div id="history"></div>
+    </div>
+
+    <div class="box hide" id="admin" style="margin-top:18px">
+      <h2>Bekleyen ödemeler</h2>
+      <div id="deposits"></div>
+    </div>
+  </section>
+</main>
+
+<div id="dep" class="hide">
+  <div class="card">
+    <h2 style="font-size:22px">Bakiye yükle</h2>
+    <div class="pay">
+      Alıcı: <b id="pay-name"></b><br>
+      Banka: <b id="pay-bank"></b><br>
+      IBAN / Papara no: <b id="pay-iban"></b>
+    </div>
+    <label for="d-sender">Gönderen ad soyad</label><input id="d-sender">
+    <label for="d-amount">Tutar (TL)</label><input id="d-amount" type="number" min="10">
+    <div class="msg" id="d-msg" role="alert"></div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn" id="d-send" type="button" style="flex:1">Ödemeyi bildir</button>
+      <button class="btn ghost" id="d-close" type="button">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Ödeme bilgilerini kendi bilgilerinle değiştir
+const PAY = { name: 'AD SOYAD', bank: 'Banka / Papara', iban: 'TR00 0000 0000 0000 0000 0000 00' };
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let mode = 'in', poll = null, me = null;
+
+async function api(path, opts = {}) {
+  const t = localStorage.getItem('t');
+  const r = await fetch('/api/' + path, { ...opts, headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: 'Bearer ' + t } : {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && t) { logout(); }
+  if (!r.ok) throw new Error(j.message || 'Bir hata oluştu.');
+  return j;
+}
+function setMsg(id, text, ok) { const e = $(id); e.textContent = text || ''; e.className = 'msg' + (ok ? ' ok' : ''); }
+
+function setMode(m) {
+  mode = m;
+  $('f-name').classList.toggle('hide', m === 'in');
+  $('tab-in').className = 'btn' + (m === 'in' ? '' : ' ghost');
+  $('tab-up').className = 'btn' + (m === 'up' ? '' : ' ghost');
+  $('auth-go').textContent = m === 'in' ? 'Giriş yap' : 'Hesap oluştur';
+  $('pass').autocomplete = m === 'in' ? 'current-password' : 'new-password';
+  setMsg('auth-msg');
+}
+$('tab-in').onclick = () => setMode('in');
+$('tab-up').onclick = () => setMode('up');
+
+$('auth-go').onclick = async () => {
+  const b = $('auth-go'); b.disabled = true;
+  try {
+    const body = { email: $('email').value, password: $('pass').value, name: $('name').value };
+    const j = await api(mode === 'in' ? 'auth/login' : 'auth/register', { method: 'POST', body });
+    localStorage.setItem('t', j.token);
+    await load();
+  } catch (e) { setMsg('auth-msg', e.message); }
+  b.disabled = false;
+};
+
+function logout() { localStorage.removeItem('t'); clearInterval(poll); $('app').classList.add('hide'); $('auth').classList.remove('hide'); }
+$('out').onclick = logout;
+
+async function load() {
+  me = await api('me');
+  $('auth').classList.add('hide'); $('app').classList.remove('hide');
+  $('bal').textContent = me.balance.toFixed(2) + ' TL';
+  $('products').innerHTML = Object.entries(me.products).map(([k, p]) =>
+    `<div class="prod"><div class="n">${esc(p.name)}</div><div class="p">${p.price} TL</div><button class="btn" data-s="${esc(k)}" type="button">Numara al</button></div>`).join('');
+  document.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => buy(b.dataset.s, b));
+  const label = { waiting: 'Bekliyor', done: 'Tamamlandı', cancelled: 'İptal, iade edildi' };
+  $('history').innerHTML = me.activations.length ? me.activations.map((a) =>
+    `<div class="row"><span>${esc(me.products[a.service]?.name || a.service)} · ${esc(a.phone || '')}</span><span class="st-${esc(a.status)}">${label[a.status] || esc(a.status)}${a.code ? ' · ' + esc(a.code) : ''}</span></div>`).join('')
+    : '<p style="color:var(--mute)">Henüz işlem yok. Yukarıdan bir ürün seçin.</p>';
+  if (me.is_admin) { $('admin').classList.remove('hide'); loadDeposits(); }
+}
+
+async function buy(service, btn) {
+  btn.disabled = true; setMsg('buy-msg');
+  try {
+    const r = await api('buy', { method: 'POST', body: { service } });
+    $('bal').textContent = r.balance.toFixed(2) + ' TL';
+    $('a-phone').textContent = r.phone; $('a-code').textContent = 'Bekleniyor…';
+    $('active').classList.remove('hide');
+    $('a-cancel').onclick = async () => { await api('cancel/' + r.id, { method: 'POST' }); clearInterval(poll); $('active').classList.add('hide'); setMsg('buy-msg', 'İptal edildi, ücret iade edildi.', true); load(); };
+    clearInterval(poll);
+    poll = setInterval(async () => {
+      try {
+        const s = await api('check/' + r.id);
+        if (s.status === 'done') { $('a-code').textContent = s.code; clearInterval(poll); load(); }
+        else if (s.status === 'cancelled') { clearInterval(poll); $('active').classList.add('hide'); setMsg('buy-msg', 'Kod gelmedi. Ücret iade edildi.', true); load(); }
+      } catch (e) { /* geçici hata, tekrar denenecek */ }
+    }, 4000);
+  } catch (e) { setMsg('buy-msg', e.message); }
+  btn.disabled = false;
+}
+
+$('open-dep').onclick = () => { $('pay-name').textContent = PAY.name; $('pay-bank').textContent = PAY.bank; $('pay-iban').textContent = PAY.iban; setMsg('d-msg'); $('dep').classList.remove('hide'); };
+$('d-close').onclick = () => $('dep').classList.add('hide');
+$('d-send').onclick = async () => {
+  try {
+    const j = await api('deposit', { method: 'POST', body: { sender: $('d-sender').value, amount: $('d-amount').value } });
+    setMsg('d-msg', j.message, true);
+  } catch (e) { setMsg('d-msg', e.message); }
+};
+
+async function loadDeposits() {
+  const rows = await api('admin/deposits');
+  $('deposits').innerHTML = rows.length ? rows.map((d) =>
+    `<div class="row"><span>${esc(d.sender)} · ${esc(d.email)} · ${Number(d.amount).toFixed(2)} TL</span><button class="btn" data-d="${d.id}" type="button">Onayla</button></div>`).join('')
+    : '<p style="color:var(--mute)">Bekleyen ödeme yok.</p>';
+  document.querySelectorAll('[data-d]').forEach((b) => b.onclick = async () => { await api('admin/deposits/' + b.dataset.d + '/approve', { method: 'POST' }); loadDeposits(); });
+}
+
+// Açılış animasyonu bitince giriş ekranı ya da panel
+setTimeout(() => { $('intro').remove(); localStorage.getItem('t') ? load().catch(logout) : $('auth').classList.remove('hide'); }, 4400);
+</script>
+</body>
+</html>
