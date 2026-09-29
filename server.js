@@ -279,7 +279,10 @@ app.get('/', (req, res) => {
     <main class="max-w-5xl mx-auto px-4 py-10 w-full flex-grow">
         <div class="relative overflow-hidden glass p-8 rounded-3xl mb-10 border border-blue-500/25 bg-gradient-to-r from-blue-950/40 via-slate-900/70 to-indigo-950/40 shadow-2xl">
             <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-blue-500/15 rounded-full blur-3xl pointer-events-none neon-bg-1"></div>
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-white mb-2 tracking-tight">Anında Sanal Numara Al</h1>
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Anında Sanal Numara Al</h1>
+                <span class="text-lg sm:text-2xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 drop-shadow-md">ANKA SİYAHSMS HİZMETLERİ</span>
+            </div>
             <p class="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">WhatsApp ve Telegram servisleriniz için Onayla SMS altyapısıyla anlık havuzdan numara çekin, kodunuzu saniyeler içinde ekranda görün.</p>
         </div>
 
@@ -373,7 +376,7 @@ app.get('/', (req, res) => {
             <button onclick="closeAdminModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-8 h-8 rounded-xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
             <div id="admin-login-screen">
                 <h3 class="text-lg font-extrabold text-white mb-3">Admin Panel Girişi</h3>
-                <input type="password" id="admin-pass-input" placeholder="Admin Şifresi" class="w-full max-w-xs bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white mb-3 focus:outline-none focus:border-amber-500">
+                <input type="password" id="admin-pass-input" autocomplete="new-password" value="" placeholder="Admin Şifresi" class="w-full max-w-xs bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white mb-3 focus:outline-none focus:border-amber-500">
                 <button onclick="loadAdminPanel()" class="w-full max-w-xs bg-amber-600 hover:bg-amber-500 text-white font-extrabold py-3 rounded-2xl text-xs transition block shadow-lg shadow-amber-600/25">Giriş Yap</button>
             </div>
             <div id="admin-dashboard" class="hidden space-y-5">
@@ -500,7 +503,7 @@ app.get('/', (req, res) => {
             const res = await fetch('/api/deposit/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUsername, senderName: document.getElementById('dep-sender').value, amount: document.getElementById('dep-amount').value }) });
             const json = await res.json(); alert(json.message); closeDepositModal();
         }
-        function openAdminModal() { document.getElementById('admin-modal').classList.remove('hidden'); }
+        function openAdminModal() { document.getElementById('admin-pass-input').value = ''; document.getElementById('admin-modal').classList.remove('hidden'); }
         function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
         async function loadAdminPanel() {
             if(document.getElementById('admin-pass-input').value !== 'aklomanti') { alert('Şifre hatalı!'); return; }
