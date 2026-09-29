@@ -1,267 +1,152 @@
 const express = require('express');
 const axios = require('axios');
-const app = express();
-const PORT = process.env.PORT || 3000;
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { Pool } = require('pg');
+const path = require('path');
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-const API_KEY = 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
+const { API_KEY, DATABASE_URL, JWT_SECRET, ADMIN_EMAIL } = process.env;
+if (!API_KEY || !DATABASE_URL || !JWT_SECRET) { console.error('API_KEY, DATABASE_URL ve JWT_SECRET tanımlanmalı.'); process.exit(1); }
 const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
+const COUNTRY = process.env.COUNTRY || '0';
+const TIMEOUT_MIN = 20;
 
-// Basit veritabanı simülasyonu (Gerçek projede MongoDB veya MySQL kullanılmalıdır)
-let users = {
-    "musteri@gmail.com": { balance: 250.00, name: "Örnek Müşteri" } // Müşterinin kendi paneli bakiyesi
+const PRODUCTS = {
+  wa: { name: 'WhatsApp', price: 200 },
+  tg: { name: 'Telegram', price: 200 },
+  lg: { name: 'Letgo', price: 80 }
 };
 
-// Servis fiyatları (Müşterinin bakiyesinden düşülecek rakamlar)
-const servicePrices = {
-    "wa": 200,
-    "tg": 200,
-    "lg": 80
-};
+const db = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const q = (t, p) => db.query(t, p);
 
-// 1. Müşteri Bakiye Sorgulama Endpoint'i
-app.get('/api/getCustomerBalance', (req, res) => {
-    // Şimdilik test için sabit bir müşteri email'i baz alıyoruz
-    const email = req.query.email || "musteri@gmail.com";
-    const user = users[email] || { balance: 0 };
-    res.json({ success: true, balance: user.balance });
-});
+async function init() {
+  await q(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, hash TEXT NOT NULL, balance NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (balance >= 0), is_admin BOOLEAN DEFAULT FALSE)`);
+  await q(`CREATE TABLE IF NOT EXISTS activations (id SERIAL PRIMARY KEY, user_id INT NOT NULL, ext_id TEXT NOT NULL, service TEXT NOT NULL, phone TEXT, price NUMERIC(10,2) NOT NULL, status TEXT NOT NULL DEFAULT 'waiting', code TEXT, created_at TIMESTAMPTZ DEFAULT now())`);
+  await q(`CREATE TABLE IF NOT EXISTS deposits (id SERIAL PRIMARY KEY, user_id INT NOT NULL, sender TEXT NOT NULL, amount NUMERIC(10,2) NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT now())`);
+}
 
-// 2. Numara Satın Alma (Müşteri bakiyesinden düşer, OnaylaSMS'ten numarayı çeker)
-app.post('/api/buyNumber', async (req, res) => {
-    const { service, country, email } = req.body;
-    const userEmail = email || "musteri@gmail.com";
-    
-    if (!users[userEmail]) {
-        return res.status(400).json({ success: false, message: 'Kullanıcı bulunamadı.' });
-    }
+const supplier = async (params) => String((await axios.get(API_URL, { params: { api_key: API_KEY, ...params }, timeout: 15000 })).data);
 
-    const price = servicePrices[service] || 100;
+const app = express();
+app.set('trust proxy', 1);
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(express.json({ limit: '10kb' }));
+app.use('/api/', rateLimit({ windowMs: 60000, max: 60 }));
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60000, max: 20 }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-    // Müşterinin yeterli bakiyesi var mı kontrol et
-    if (users[userEmail].balance < price) {
-        return res.status(400).json({ 
-            success: false, 
-            message: `Bakiyeniz yetersiz! Bu ürün ${price} TL, sizin bakiyeniz ${users[userEmail].balance} TL. Lütfen bakiye yükleyin.` 
-        });
-    }
+const wrap = (fn) => (req, res) => fn(req, res).catch((e) => { console.error(e.message); res.status(500).json({ message: 'Sunucu hatası. Biraz sonra tekrar deneyin.' }); });
 
-    try {
-        // Onayla SMS API üzerinden senin ana bakiyenle numarayı satın al
-        const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getNumber&service=${service}&country=${country || 0}`);
-        const resultText = response.data;
+function auth(req, res, next) {
+  try {
+    req.uid = jwt.verify((req.headers.authorization || '').replace('Bearer ', ''), JWT_SECRET).uid;
+    next();
+  } catch { res.status(401).json({ message: 'Oturum süresi doldu. Tekrar giriş yapın.' }); }
+}
+async function admin(req, res, next) {
+  const { rows } = await q('SELECT is_admin FROM users WHERE id=$1', [req.uid]);
+  if (!rows[0]?.is_admin) return res.status(403).json({ message: 'Yetkiniz yok.' });
+  next();
+}
+const token = (uid) => jwt.sign({ uid }, JWT_SECRET, { expiresIn: '7d' });
 
-        if (resultText.startsWith('ACCESS_NUMBER')) {
-            // Numara başarıyla alındı, müşterinin bakiyesinden düşelim
-            users[userEmail].balance -= price;
+app.post('/api/auth/register', wrap(async (req, res) => {
+  const { name, email, password } = req.body;
+  if (!name || !/^\S+@\S+\.\S+$/.test(email || '') || (password || '').length < 8)
+    return res.status(400).json({ message: 'Ad, geçerli bir e-posta ve en az 8 karakterli şifre girin.' });
+  const isAdmin = !!ADMIN_EMAIL && email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  try {
+    const { rows } = await q('INSERT INTO users(email,name,hash,is_admin) VALUES($1,$2,$3,$4) RETURNING id', [email.toLowerCase(), name.trim().slice(0, 60), await bcrypt.hash(password, 10), isAdmin]);
+    res.json({ token: token(rows[0].id) });
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ message: 'Bu e-posta zaten kayıtlı. Giriş yapın.' });
+    throw e;
+  }
+}));
 
-            const parts = resultText.split(':');
-            return res.json({
-                success: true,
-                activationId: parts[1],
-                phoneNumber: parts[2],
-                remainingBalance: users[userEmail].balance,
-                message: 'Numara başarıyla alındı!'
-            });
-        } else {
-            return res.status(400).json({ success: false, message: `Sistem hatası (Tedarikçi): ${resultText}` });
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Sunucu bağlantı hatası.', error: error.message });
-    }
-});
+app.post('/api/auth/login', wrap(async (req, res) => {
+  const { email, password } = req.body;
+  const { rows } = await q('SELECT * FROM users WHERE email=$1', [String(email || '').toLowerCase()]);
+  if (!rows[0] || !(await bcrypt.compare(String(password || ''), rows[0].hash)))
+    return res.status(401).json({ message: 'E-posta veya şifre hatalı.' });
+  res.json({ token: token(rows[0].id) });
+}));
 
-// 3. SMS Kodunu Kontrol Etme Endpoint'i
-app.get('/api/checkSms/:activationId', async (req, res) => {
-    const { activationId } = req.params;
-    try {
-        const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getStatus&id=${activationId}`);
-        const resultText = response.data;
+app.get('/api/me', auth, wrap(async (req, res) => {
+  const { rows } = await q('SELECT name,email,balance,is_admin FROM users WHERE id=$1', [req.uid]);
+  const acts = await q('SELECT id,service,phone,price,status,code,created_at FROM activations WHERE user_id=$1 ORDER BY id DESC LIMIT 10', [req.uid]);
+  res.json({ ...rows[0], balance: Number(rows[0].balance), products: PRODUCTS, activations: acts.rows });
+}));
 
-        if (resultText.startsWith('STATUS_OK')) {
-            return res.json({ success: true, status: 'completed', code: resultText.split(':')[1] });
-        } else if (resultText === 'STATUS_WAIT_CODE') {
-            return res.json({ success: true, status: 'waiting', message: 'Kod bekleniyor...' });
-        } else {
-            return res.json({ success: true, status: resultText, message: resultText });
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'SMS kontrol edilemedi.', error: error.message });
-    }
-});
+app.post('/api/buy', auth, wrap(async (req, res) => {
+  const p = PRODUCTS[req.body.service];
+  if (!p) return res.status(400).json({ message: 'Geçersiz ürün.' });
+  // Atomik düşüm: bakiye yetersizse satır güncellenmez
+  const paid = await q('UPDATE users SET balance=balance-$1 WHERE id=$2 AND balance>=$1 RETURNING balance', [p.price, req.uid]);
+  if (!paid.rows[0]) return res.status(400).json({ message: `Bakiye yetersiz. ${p.name} ${p.price} TL. Bakiye yükleyin.` });
+  const refund = () => q('UPDATE users SET balance=balance+$1 WHERE id=$2', [p.price, req.uid]);
+  try {
+    const out = await supplier({ action: 'getNumber', service: req.body.service, country: COUNTRY });
+    if (!out.startsWith('ACCESS_NUMBER')) { await refund(); return res.status(400).json({ message: 'Şu an bu ürün için numara yok. Ücret iade edildi.' }); }
+    const [, extId, phone] = out.split(':');
+    const a = await q('INSERT INTO activations(user_id,ext_id,service,phone,price) VALUES($1,$2,$3,$4,$5) RETURNING id', [req.uid, extId, req.body.service, phone, p.price]);
+    res.json({ id: a.rows[0].id, phone, balance: Number(paid.rows[0].balance) });
+  } catch (e) { await refund(); throw e; }
+}));
 
-// Ana Arayüz (Frontend)
-app.get('/', (req, res) => {
-    res.send(`<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AnkaSMS - Müşteri Paneli</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f3f4f6; }
-        .glass { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.2); }
-    </style>
-</head>
-<body class="min-h-screen flex flex-col justify-between">
-    <header class="glass sticky top-0 z-40 border-b border-blue-900/30 px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 bg-blue-600/20 border border-blue-500/40 rounded-xl flex items-center justify-center">
-                <i class="fa-solid fa-bolt text-blue-400"></i>
-            </div>
-            <div>
-                <span class="font-bold text-lg tracking-tight text-white">AnkaSMS</span>
-                <span class="block text-[10px] text-blue-400 font-medium">MÜŞTERİ PANELİ</span>
-            </div>
-        </div>
-        <div class="flex items-center space-x-3">
-            <div class="glass px-3 py-1.5 rounded-xl flex items-center space-x-2 text-sm border-blue-500/20">
-                <i class="fa-solid fa-wallet text-emerald-400"></i>
-                <span class="text-slate-400">Bakiyeniz:</span>
-                <span id="customer-balance" class="font-bold text-emerald-400">Yükleniyor...</span>
-            </div>
-            <button onclick="openDepositModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-blue-600/20">
-                <i class="fa-solid fa-plus mr-1"></i> Bakiye Yükle
-            </button>
-        </div>
-    </header>
+// Bir kez iptal + iade (tekrar çağrılırsa çift iade olmaz)
+async function cancelAndRefund(a) {
+  const c = await q("UPDATE activations SET status='cancelled' WHERE id=$1 AND status='waiting' RETURNING id", [a.id]);
+  if (!c.rows[0]) return false;
+  await supplier({ action: 'setStatus', id: a.ext_id, status: 8 }).catch(() => {});
+  await q('UPDATE users SET balance=balance+$1 WHERE id=$2', [a.price, a.user_id]);
+  return true;
+}
 
-    <main class="max-w-4xl mx-auto px-4 py-8 w-full flex-grow">
-        <div class="glass p-6 rounded-2xl mb-8 border border-blue-500/30">
-            <h2 class="text-xl font-bold text-white mb-4 flex items-center space-x-2">
-                <i class="fa-solid fa-cart-shopping text-blue-500"></i>
-                <span>Hızlı Numara Satın Al</span>
-            </h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1">Servis Seçin</label>
-                    <select id="service-select" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2.5 text-xs text-white">
-                        <option value="wa">WhatsApp - 200 TL</option>
-                        <option value="tg">Telegram - 200 TL</option>
-                        <option value="lg">Letgo TR SMS - 80 TL</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1">Ülke Kodu</label>
-                    <input type="text" id="country-input" value="0" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2.5 text-xs text-white" placeholder="Örn: 0">
-                </div>
-            </div>
-            <button onclick="buyNumber()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg shadow-blue-600/20">
-                Numara Satın Al ve Kodu Bekle
-            </button>
-        </div>
+app.get('/api/check/:id', auth, wrap(async (req, res) => {
+  const { rows } = await q('SELECT * FROM activations WHERE id=$1 AND user_id=$2', [Number(req.params.id) || 0, req.uid]);
+  const a = rows[0];
+  if (!a) return res.status(404).json({ message: 'İşlem bulunamadı.' });
+  if (a.status !== 'waiting') return res.json({ status: a.status, code: a.code });
+  const out = await supplier({ action: 'getStatus', id: a.ext_id });
+  if (out.startsWith('STATUS_OK')) {
+    const code = out.split(':')[1];
+    await q("UPDATE activations SET status='done', code=$1 WHERE id=$2", [code, a.id]);
+    return res.json({ status: 'done', code });
+  }
+  if (Date.now() - new Date(a.created_at) > TIMEOUT_MIN * 60000) {
+    await cancelAndRefund(a);
+    return res.json({ status: 'cancelled' });
+  }
+  res.json({ status: 'waiting' });
+}));
 
-        <div id="result-box" class="hidden glass p-6 rounded-2xl border border-emerald-500/30">
-            <h3 class="text-lg font-bold text-emerald-400 mb-2"><i class="fa-solid fa-circle-check"></i> Numara Tahsis Edildi</h3>
-            <p class="text-xs text-slate-300 mb-2">Telefon Numaranız: <b id="res-phone" class="text-white text-sm font-mono"></b></p>
-            <p class="text-xs text-slate-300 mb-4">İşlem ID: <span id="res-id" class="font-mono text-slate-400"></span></p>
-            
-            <div class="bg-slate-900/80 p-4 rounded-xl border border-blue-500/20">
-                <span class="text-xs text-slate-400 block mb-1">Gelen SMS Kodu:</span>
-                <div id="res-code" class="text-2xl font-extrabold text-blue-400 font-mono">Kod bekleniyor...</div>
-            </div>
-        </div>
-    </main>
+app.post('/api/cancel/:id', auth, wrap(async (req, res) => {
+  const { rows } = await q('SELECT * FROM activations WHERE id=$1 AND user_id=$2', [Number(req.params.id) || 0, req.uid]);
+  if (!rows[0]) return res.status(404).json({ message: 'İşlem bulunamadı.' });
+  res.json({ refunded: await cancelAndRefund(rows[0]) });
+}));
 
-    <!-- Bakiye Yükleme Modalı (Arda Sakla Adına Ödeme) -->
-    <div id="deposit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="glass w-full max-w-md rounded-2xl p-6 border border-blue-500/30 relative">
-            <button onclick="closeDepositModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-            <h3 class="text-lg font-bold text-white mb-2"><i class="fa-solid fa-wallet text-blue-500"></i> Bakiye Yükleme Bilgileri</h3>
-            <p class="text-xs text-slate-400 mb-4">Aşağıdaki hesaba ödeme yaptıktan sonra bildirim gönderin:</p>
-            
-            <div class="bg-slate-900/90 p-4 rounded-xl border border-blue-500/30 mb-4 space-y-2 text-xs">
-                <div class="flex justify-between"><span class="text-slate-400">Alıcı Ad Soyad:</span> <span class="font-bold text-emerald-400 text-sm">Arda Sakla</span></div>
-                <div class="flex justify-between"><span class="text-slate-400">Banka / Papara:</span> <span class="font-semibold text-white">Papara / Ziraat Bankası</span></div>
-                <div class="flex justify-between"><span class="text-slate-400">IBAN / Papara No:</span> <span class="font-mono text-blue-300 font-bold">TR36 0001 0020 3040 5060 7080 90</span></div>
-            </div>
+app.post('/api/deposit', auth, wrap(async (req, res) => {
+  const amount = Number(req.body.amount), sender = String(req.body.sender || '').trim().slice(0, 80);
+  if (!sender || !(amount >= 10 && amount <= 50000)) return res.status(400).json({ message: 'Gönderen adı ve 10-50000 TL arası tutar girin.' });
+  await q('INSERT INTO deposits(user_id,sender,amount) VALUES($1,$2,$3)', [req.uid, sender, amount]);
+  res.json({ message: 'Bildirim alındı. Ödeme kontrol edilince bakiyeniz eklenecek.' });
+}));
 
-            <div class="space-y-3">
-                <input type="text" id="dep-name" placeholder="Gönderen Adınız Soyadınız" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2 text-xs text-white">
-                <input type="number" id="dep-amount" placeholder="Yatırılan Tutar (TL)" class="w-full bg-slate-900 border border-blue-500/30 rounded-xl px-4 py-2 text-xs text-white">
-                <button onclick="sendDepositNotice()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs transition">Ödeme Bildirimi Gönder</button>
-            </div>
-        </div>
-    </div>
+app.get('/api/admin/deposits', auth, admin, wrap(async (req, res) => {
+  const { rows } = await q("SELECT d.id,d.sender,d.amount,d.created_at,u.email FROM deposits d JOIN users u ON u.id=d.user_id WHERE d.status='pending' ORDER BY d.id");
+  res.json(rows);
+}));
 
-    <script>
-        async function fetchBalance() {
-            try {
-                const res = await fetch('/api/getCustomerBalance');
-                const json = await res.json();
-                if(json.success) {
-                    document.getElementById('customer-balance').innerText = json.balance.toFixed(2) + ' TL';
-                }
-            } catch(e) { console.error(e); }
-        }
-        fetchBalance();
+app.post('/api/admin/deposits/:id/approve', auth, admin, wrap(async (req, res) => {
+  const d = await q("UPDATE deposits SET status='approved' WHERE id=$1 AND status='pending' RETURNING user_id,amount", [Number(req.params.id) || 0]);
+  if (!d.rows[0]) return res.status(404).json({ message: 'Bekleyen bildirim yok.' });
+  await q('UPDATE users SET balance=balance+$1 WHERE id=$2', [d.rows[0].amount, d.rows[0].user_id]);
+  res.json({ ok: true });
+}));
 
-        let checkInterval = null;
-
-        async function buyNumber() {
-            const service = document.getElementById('service-select').value;
-            const country = document.getElementById('country-input').value;
-
-            alert('Numara talep ediliyor, lütfen bekleyin...');
-            
-            try {
-                const res = await fetch('/api/buyNumber', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ service, country, email: 'musteri@gmail.com' })
-                });
-                const json = await res.json();
-
-                if(json.success) {
-                    document.getElementById('result-box').classList.remove('hidden');
-                    document.getElementById('res-phone').innerText = json.phoneNumber;
-                    document.getElementById('res-id').innerText = json.activationId;
-                    
-                    // Bakiyeyi güncelle
-                    document.getElementById('customer-balance').innerText = json.remainingBalance.toFixed(2) + ' TL';
-
-                    if(checkInterval) clearInterval(checkInterval);
-                    checkInterval = setInterval(() => checkSmsCode(json.activationId), 3000);
-                } else {
-                    alert('Hata: ' + json.message);
-                }
-            } catch(e) {
-                alert('Bağlantı hatası oluştu!');
-            }
-        }
-
-        async function checkSmsCode(activationId) {
-            try {
-                const res = await fetch(\`/api/checkSms/\${activationId}\`);
-                const json = await res.json();
-
-                if(json.success && json.status === 'completed') {
-                    document.getElementById('res-code').innerText = json.code;
-                    clearInterval(checkInterval);
-                    alert('SMS Kodu başarıyla geldi!');
-                }
-            } catch(e) { console.error(e); }
-        }
-
-        function openDepositModal() { document.getElementById('deposit-modal').classList.remove('hidden'); }
-        function closeDepositModal() { document.getElementById('deposit-modal').classList.add('hidden'); }
-        function sendDepositNotice() {
-            const name = document.getElementById('dep-name').value;
-            const amount = document.getElementById('dep-amount').value;
-            if(!name || !amount) { alert('Lütfen alanları doldurun.'); return; }
-            alert('Ödeme bildiriminiz Arda Sakla adına alınmıştır. Admin onayından sonra bakiyeniz eklenecektir.');
-            closeDepositModal();
-        }
-    </script>
-</body>
-</html>`);
-});
-
-app.listen(PORT, () => {
-    console.log('Sunucu calisiyor, port:', PORT);
-});
+init().then(() => app.listen(process.env.PORT || 3000, () => console.log('AnkaSMS çalışıyor'))).catch((e) => { console.error(e); process.exit(1); });
