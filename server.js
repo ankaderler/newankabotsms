@@ -12,7 +12,12 @@ const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
 app.get('/api/getBalance', async (req, res) => {
     try {
         const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getBalance`);
-        res.json({ success: true, data: response.data });
+        let rawData = response.data; // Örn: ACCESS_BALANCE:6.85
+        let balance = rawData;
+        if (typeof rawData === 'string' && rawData.includes(':')) {
+            balance = rawData.split(':')[1];
+        }
+        res.json({ success: true, data: balance });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Bakiye alınamadı.', error: error.message });
     }
@@ -71,8 +76,6 @@ app.get('/', (req, res) => {
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f3f4f6; }
         .glass { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.2); }
-        .glass-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(59, 130, 246, 0.15); transition: all 0.3s ease; }
-        .glass-card:hover { border-color: rgba(59, 130, 246, 0.5); transform: translateY(-3px); }
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between">
@@ -89,8 +92,8 @@ app.get('/', (req, res) => {
         <div class="flex items-center space-x-3">
             <div class="glass px-3 py-1.5 rounded-xl flex items-center space-x-2 text-sm border-blue-500/20">
                 <i class="fa-solid fa-wallet text-blue-400"></i>
-                <span class="text-slate-400">Sistem Bakiye:</span>
-                <span id="system-balance" class="font-bold text-blue-300">Yükleniyor...</span>
+                <span class="text-slate-400">Bakiye:</span>
+                <span id="system-balance" class="font-bold text-emerald-400">Yükleniyor...</span>
             </div>
             <button onclick="openDepositModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-blue-600/20">
                 <i class="fa-solid fa-plus mr-1"></i> Bakiye Yükle
@@ -135,7 +138,7 @@ app.get('/', (req, res) => {
         </div>
     </main>
 
-    <!-- Bakiye Yükleme Modalı (Ad Soyad Bilgisi Eklendi) -->
+    <!-- Bakiye Yükleme Modalı -->
     <div id="deposit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="glass w-full max-w-md rounded-2xl p-6 border border-blue-500/30 relative">
             <button onclick="closeDepositModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -162,7 +165,7 @@ app.get('/', (req, res) => {
                 const res = await fetch('/api/getBalance');
                 const json = await res.json();
                 if(json.success) {
-                    document.getElementById('system-balance').innerText = json.data;
+                    document.getElementById('system-balance').innerText = json.data + ' TL';
                 }
             } catch(e) { console.error(e); }
         }
