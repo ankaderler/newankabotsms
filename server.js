@@ -9,56 +9,71 @@ app.use(express.urlencoded({ extended: true }));
 const API_KEY = process.env.API_KEY || 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
 const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
 
-// Veritabanı ve kullanıcı simülasyonu (Bakiyelerin karışmaması için her kullanıcıya özel)
+// Veritabanı ve Bellek Yapıları
 let users = {
-    "musteri@gmail.com": { balance: 350.00, name: "Resul Sakal", password: "123" }
+    "aklomanti": { balance: 1000.00, password: "123", name: "Resul Sakal (Admin)" }
 };
 
-// İstediğin Ürünler, Ülke Kodları ve Fiyatlar (OnaylaSMS uyumlu)
+let visitorsCount = 0;
+let recentVisitors = [];
+let depositRequests = [];
+
+// İstediğin Ürün Sıralaması ve İsimleri
 const services = [
     { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
     { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 220, icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
     { id: "tg_usa", service: "tg", country: "18", name: "Telegram ABD", price: 150, icon: "fa-telegram", color: "text-indigo-400", bg: "bg-indigo-500/15", border: "border-indigo-500/40" },
-    { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Philippines", price: 150, icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" },
+    { id: "wa_ph", service: "wa", country: "4", name: "Filipinler", price: 150, icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" },
     { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 150, icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" }
 ];
+
+app.use((req, res, next) => {
+    if (req.path === '/' && req.method === 'GET') {
+        visitorsCount++;
+        recentVisitors.push({ ip: req.ip || '127.0.0.1', time: new Date().toLocaleTimeString('tr-TR') });
+        if(recentVisitors.length > 20) recentVisitors.shift();
+    }
+    next();
+});
 
 app.get('/api/getServices', (req, res) => {
     res.json({ success: true, services });
 });
 
 app.get('/api/getCustomerBalance', (req, res) => {
-    const email = req.query.email || "musteri@gmail.com";
-    if (!users[email]) {
-        users[email] = { balance: 50.00, name: "Kullanıcı", password: "123" };
+    const username = req.query.username || "misafir";
+    if (!users[username]) {
+        return res.json({ success: true, balance: 0.00, name: username });
     }
-    res.json({ success: true, balance: users[email].balance, name: users[email].name });
+    res.json({ success: true, balance: users[username].balance, name: username });
 });
 
 app.post('/api/auth/login', (req, res) => {
-    const { email, password } = req.body;
-    if (users[email] && users[email].password === password) {
-        res.json({ success: true, message: 'Giriş başarılı!', email, name: users[email].name, balance: users[email].balance });
+    const { username, password } = req.body;
+    if (users[username] && users[username].password === password) {
+        res.json({ success: true, message: 'Giriş başarılı!', username, balance: users[username].balance });
     } else {
-        res.status(400).json({ success: false, message: 'E-posta veya şifre hatalı!' });
+        res.status(400).json({ success: false, message: 'Kullanıcı adı veya şifre hatalı!' });
     }
 });
 
 app.post('/api/auth/register', (req, res) => {
-    const { name, email, password } = req.body;
-    if (users[email]) {
-        return res.status(400).json({ success: false, message: 'Bu e-posta adresi zaten kayıtlı!' });
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Lütfen tüm alanları doldurun.' });
     }
-    users[email] = { name, password, balance: 50.00 }; // 50 TL hoşgeldin bonusu
-    res.json({ success: true, message: 'Kayıt başarılı! 50 TL bonus eklendi.', email, name, balance: 50.00 });
+    if (users[username]) {
+        return res.status(400).json({ success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
+    }
+    users[username] = { password, balance: 20.00 }; // 20 TL bonus
+    res.json({ success: true, message: 'Kayıt başarılı! 20 TL bonus hesabınıza eklendi.', username, balance: 20.00 });
 });
 
-// Numara Satın Alma Altyapısı (OnaylaSMS)
+// Numara Satın Alma (OnaylaSMS Entegrasyonlu)
 app.post('/api/buyNumber', async (req, res) => {
-    const { productKey, email } = req.body;
-    const userEmail = email || "musteri@gmail.com";
+    const { productKey, username } = req.body;
     
-    if (!users[userEmail]) {
+    if (!users[username]) {
         return res.status(400).json({ success: false, message: 'Oturum bulunamadı. Lütfen giriş yapın.' });
     }
 
@@ -67,10 +82,10 @@ app.post('/api/buyNumber', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Ürün bulunamadı.' });
     }
 
-    if (users[userEmail].balance < product.price) {
+    if (users[username].balance < product.price) {
         return res.status(400).json({ 
             success: false, 
-            message: `Bakiyeniz yetersiz! Bu ürün ${product.price} TL, sizin bakiyeniz ${users[userEmail].balance.toFixed(2)} TL.` 
+            message: `Bakiyeniz yetersiz! Bu ürün ${product.price} TL, sizin bakiyeniz ${users[username].balance.toFixed(2)} TL.` 
         });
     }
 
@@ -80,13 +95,13 @@ app.post('/api/buyNumber', async (req, res) => {
         const resultText = response.data;
 
         if (resultText.startsWith('ACCESS_NUMBER')) {
-            users[userEmail].balance -= product.price;
+            users[username].balance -= product.price;
             const parts = resultText.split(':');
             return res.json({
                 success: true,
                 activationId: parts[1],
                 phoneNumber: parts[2],
-                remainingBalance: users[userEmail].balance,
+                remainingBalance: users[username].balance,
                 productName: product.name,
                 message: 'Numara başarıyla alındı!'
             });
@@ -98,7 +113,7 @@ app.post('/api/buyNumber', async (req, res) => {
     }
 });
 
-// SMS Kontrol Endpoint'i
+// SMS Takip
 app.get('/api/checkSms/:activationId', async (req, res) => {
     const { activationId } = req.params;
     try {
@@ -117,6 +132,63 @@ app.get('/api/checkSms/:activationId', async (req, res) => {
     }
 });
 
+// Ödeme Bildirimi Oluşturma
+app.post('/api/deposit/notify', (req, res) => {
+    const { username, senderName, amount } = req.body;
+    if (!senderName || !amount) {
+        return res.status(400).json({ success: false, message: 'Bilgiler eksik.' });
+    }
+    depositRequests.push({
+        id: Date.now(),
+        username: username || 'Misafir',
+        senderName,
+        amount: parseFloat(amount),
+        status: 'Bekliyor',
+        time: new Date().toLocaleString('tr-TR')
+    });
+    res.json({ success: true, message: 'Ödeme bildiriminiz başarıyla iletildi.' });
+});
+
+// Admin Paneli Verileri
+app.get('/api/admin/data', (req, res) => {
+    res.json({
+        success: true,
+        visitorsCount,
+        recentVisitors,
+        depositRequests,
+        usersCount: Object.keys(users).length
+    });
+});
+
+// Admin İşlemi (Onayla / Reddet)
+app.post('/api/admin/action', (req, res) => {
+    const { password, actionId, decision } = req.body;
+    if (password !== 'aklomanti') {
+        return res.status(403).json({ success: false, message: 'Yetkisiz şifre!' });
+    }
+
+    const reqIndex = depositRequests.findIndex(d => d.id === actionId);
+    if (reqIndex === -1) {
+        return res.status(404).json({ success: false, message: 'Bildirim bulunamadı.' });
+    }
+
+    const dep = depositRequests[reqIndex];
+    if (decision === 'approve') {
+        if (users[dep.username]) {
+            users[dep.username].balance += dep.amount;
+        } else {
+            // Eğer kullanıcı adı bulunamazsa ilk kayıtlı kullanıcıya ekle veya geçici oluştur
+            users[dep.username] = { password: "123", balance: dep.amount };
+        }
+        dep.status = 'Onaylandı';
+    } else {
+        dep.status = 'Reddedildi';
+    }
+
+    res.json({ success: true, message: `İşlem başarıyla güncellendi: ${dep.status}` });
+});
+
+// Ana Sayfa HTML
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr" class="dark">
@@ -134,8 +206,10 @@ app.get('/', (req, res) => {
         .glass-card:hover { transform: translateY(-6px); border-color: rgba(59, 130, 246, 0.6); box-shadow: 0 20px 40px -15px rgba(59, 130, 246, 0.3); }
         @keyframes modalAnim { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .animate-modal { animation: modalAnim 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        @keyframes glow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
-        .animate-glow { animation: glow 4s ease-in-out infinite; }
+        @keyframes glow { 0%, 100% { opacity: 0.4; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } }
+        .animate-glow { animation: glow 5s ease-in-out infinite; }
+        @keyframes floatAnim { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        .support-float { animation: floatAnim 3s ease-in-out infinite; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between selection:bg-blue-600 selection:text-white">
@@ -163,12 +237,15 @@ app.get('/', (req, res) => {
             </button>
             <button onclick="openAuthModal()" class="glass hover:bg-slate-800 text-slate-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition border border-slate-700 flex items-center space-x-1.5">
                 <i class="fa-solid fa-user-circle text-blue-400 text-sm"></i>
-                <span id="user-profile-text">Giriş / Kayıt</span>
+                <span id="user-profile-text">Giriş / Kayıt Ol</span>
+            </button>
+            <button onclick="openAdminModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-2.5 rounded-2xl text-xs font-bold transition border border-amber-500/30" title="Admin Paneli">
+                <i class="fa-solid fa-shield-halved"></i>
             </button>
         </div>
     </header>
 
-    <!-- Main -->
+    <!-- Main Content -->
     <main class="max-w-6xl mx-auto px-4 py-10 w-full flex-grow">
         <div class="relative overflow-hidden glass p-8 sm:p-10 rounded-3xl mb-12 border border-blue-500/30 bg-gradient-to-r from-blue-950/50 via-slate-900/80 to-indigo-950/50 shadow-2xl">
             <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none animate-glow"></div>
@@ -184,13 +261,18 @@ app.get('/', (req, res) => {
             <span class="text-xs text-blue-400 font-semibold bg-blue-500/10 px-3 py-1 rounded-xl border border-blue-500/20">Canlı Stok</span>
         </div>
 
-        <!-- Ürünler Listesi -->
+        <!-- Ürünler Grid -->
         <div id="services-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-12">
             <!-- Dinamik yüklenecek -->
         </div>
     </main>
 
-    <!-- SATIN ALMA VE KOD TAKİP PANELİ (MODAL) -->
+    <!-- CANLI DESTEK BUTONU (Telegram Aklomanti) -->
+    <a href="https://t.me/aklomanti" target="_blank" class="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white p-4 rounded-full shadow-2xl shadow-blue-500/50 flex items-center justify-center text-xl support-float border border-blue-400/40" title="Canlı Destek ile Bağlan">
+        <i class="fa-brands fa-telegram"></i>
+    </a>
+
+    <!-- NUMARA SATIN ALMA VE KOD TAKİP MODALI -->
     <div id="order-modal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
         <div class="glass w-full max-w-lg rounded-3xl p-8 border border-blue-500/40 relative animate-modal shadow-2xl">
             <button onclick="closeOrderModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-2xl bg-slate-800/80 flex items-center justify-center transition border border-slate-700"><i class="fa-solid fa-xmark text-sm"></i></button>
@@ -243,22 +325,24 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
-    <!-- 4K ANİMASYONLU GİRİŞ / KAYIT MODALI -->
+    <!-- 4K NEON ANİMASYONLU GİRİŞ / KAYIT MODALI -->
     <div id="auth-modal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
         <div class="glass w-full max-w-md rounded-3xl p-8 border border-blue-500/40 relative animate-modal shadow-2xl overflow-hidden">
-            <div class="absolute -top-12 -left-12 w-40 h-40 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
-            <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-2xl bg-slate-800/80 flex items-center justify-center transition border border-slate-700"><i class="fa-solid fa-xmark text-sm"></i></button>
+            <div class="absolute -top-12 -left-12 w-40 h-40 bg-blue-600/20 rounded-full blur-3xl pointer-events-none animate-glow"></div>
+            <div class="absolute -bottom-12 -right-12 w-40 h-40 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none animate-glow"></div>
             
-            <div class="flex space-x-2 mb-6 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
+            <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-2xl bg-slate-800/80 flex items-center justify-center transition border border-slate-700 z-10"><i class="fa-solid fa-xmark text-sm"></i></button>
+            
+            <div class="flex space-x-2 mb-6 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 relative z-10">
                 <button onclick="switchAuthTab('login')" id="tab-login-btn" class="flex-1 py-2.5 rounded-xl text-xs font-bold transition bg-blue-600 text-white shadow-lg shadow-blue-600/30">Giriş Yap</button>
                 <button onclick="switchAuthTab('register')" id="tab-register-btn" class="flex-1 py-2.5 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white">Kayıt Ol</button>
             </div>
 
             <!-- Giriş Formu -->
-            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4 relative z-10">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1.5">E-posta Adresi</label>
-                    <input type="email" id="login-email" required class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
+                    <label class="block text-xs text-slate-400 mb-1.5">Kullanıcı Adı</label>
+                    <input type="text" id="login-username" required class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1.5">Şifre</label>
@@ -268,20 +352,16 @@ app.get('/', (req, res) => {
             </form>
 
             <!-- Kayıt Formu -->
-            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4 relative z-10 hidden">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1.5">Ad Soyad</label>
-                    <input type="text" id="reg-name" required class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
-                </div>
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1.5">E-posta Adresi</label>
-                    <input type="email" id="reg-email" required class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
+                    <label class="block text-xs text-slate-400 mb-1.5">Kullanıcı Adı Seç</label>
+                    <input type="text" id="reg-username" required class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1.5">Şifre Belirle</label>
                     <input type="password" id="reg-password" required class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
                 </div>
-                <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-xl shadow-emerald-600/30">Kayıt Ol ve 50 TL Kazan</button>
+                <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-xl shadow-emerald-600/30">Kayıt Ol ve 20 TL Kazan</button>
             </form>
         </div>
     </div>
@@ -294,7 +374,7 @@ app.get('/', (req, res) => {
                 <i class="fa-solid fa-wallet text-blue-500"></i>
                 <span>Bakiye Yükleme Bilgileri</span>
             </h3>
-            <p class="text-xs text-slate-400 mb-5">Ödemenizi aşağıdaki hesaba yaptıktan sonra bildirim gönderin:</p>
+            <p class="text-xs text-slate-400 mb-5">Ödemenizi aşağıdaki Garanti Bankası hesabına yaptıktan sonra bildirim gönderin:</p>
             
             <div class="bg-slate-900/90 p-5 rounded-2xl border border-blue-500/30 mb-5 space-y-3 text-xs">
                 <div class="flex justify-between items-center"><span class="text-slate-400">Alıcı Adı:</span> <span class="font-extrabold text-emerald-400 text-sm">Resul Sakal</span></div>
@@ -304,9 +384,85 @@ app.get('/', (req, res) => {
             <button onclick="navigator.clipboard.writeText('TR620006200050000006810773'); alert('IBAN kopyalandı!');" class="w-full mb-4 bg-slate-800 hover:bg-slate-700 text-blue-400 py-2.5 rounded-xl text-xs font-bold transition border border-slate-700">IBAN'ı Kopyala</button>
 
             <div class="space-y-3">
-                <input type="text" id="dep-name" placeholder="Gönderen Adınız Soyadınız" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
+                <input type="text" id="dep-sender" placeholder="Gönderen Adınız Soyadınız" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
                 <input type="number" id="dep-amount" placeholder="Yatırılan Tutar (TL)" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
                 <button onclick="sendDepositNotice()" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-xl shadow-emerald-600/30">Ödeme Bildirimi Gönder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN PANELİ MODALI -->
+    <div id="admin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
+        <div class="glass w-full max-w-4xl rounded-3xl p-6 sm:p-8 border border-amber-500/40 relative animate-modal shadow-2xl max-h-[90vh] overflow-y-auto">
+            <button onclick="closeAdminModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-2xl bg-slate-800/80 flex items-center justify-center transition border border-slate-700"><i class="fa-solid fa-xmark text-sm"></i></button>
+            
+            <div id="admin-login-screen">
+                <div class="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-400 text-xl mb-4 border border-amber-500/30">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h3 class="text-xl font-extrabold text-white mb-2">Admin Paneli Girişi</h3>
+                <p class="text-xs text-slate-400 mb-6">Yönetici şifrenizi girerek finans ve ziyaretçi raporlarına ulaşın.</p>
+                <div class="space-y-4 max-w-sm">
+                    <input type="password" id="admin-pass-input" placeholder="Admin Şifresi" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
+                    <button onclick="loadAdminPanel()" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-lg shadow-amber-600/30">Paneli Aç</button>
+                </div>
+            </div>
+
+            <div id="admin-dashboard" class="hidden space-y-6">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <div>
+                        <h3 class="text-xl font-extrabold text-amber-400 flex items-center space-x-2">
+                            <i class="fa-solid fa-gauge-high"></i>
+                            <span>Resul Sakal - Admin Yönetim Paneli</span>
+                        </h3>
+                        <p class="text-xs text-slate-400">Canlı ziyaretçiler, bekleyen ödemeler ve finansal kontroller.</p>
+                    </div>
+                    <button onclick="document.getElementById('admin-dashboard').classList.add('hidden'); document.getElementById('admin-login-screen').classList.remove('hidden');" class="bg-slate-800 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-700">Çıkış</button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-slate-900/80 p-4 rounded-2xl border border-blue-500/20">
+                        <span class="text-xs text-slate-400 block mb-1">Toplam Ziyaretçi</span>
+                        <span id="adm-vis-count" class="text-2xl font-extrabold text-white">0</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-4 rounded-2xl border border-emerald-500/20">
+                        <span class="text-xs text-slate-400 block mb-1">Kayıtlı Kullanıcı</span>
+                        <span id="adm-user-count" class="text-2xl font-extrabold text-emerald-400">0</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-4 rounded-2xl border border-amber-500/20">
+                        <span class="text-xs text-slate-400 block mb-1">Bekleyen Ödemeler</span>
+                        <span id="adm-dep-count" class="text-2xl font-extrabold text-amber-400">0</span>
+                    </div>
+                </div>
+
+                <!-- Ödeme Bildirimleri -->
+                <div>
+                    <h4 class="text-sm font-extrabold text-white mb-3">Müşteri Ödeme Bildirimleri</h4>
+                    <div class="bg-slate-900/90 rounded-2xl border border-slate-800 overflow-hidden">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-800/80 text-slate-400 border-b border-slate-700">
+                                <tr>
+                                    <th class="p-3">Kullanıcı</th>
+                                    <th class="p-3">Gönderen Adı</th>
+                                    <th class="p-3">Tutar</th>
+                                    <th class="p-3">Durum</th>
+                                    <th class="p-3 text-right">İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adm-deposit-table">
+                                <!-- Dinamik -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Son Ziyaretçiler -->
+                <div>
+                    <h4 class="text-sm font-extrabold text-white mb-3">Son Site Ziyaretçileri</h4>
+                    <div class="bg-slate-900/90 rounded-2xl border border-slate-800 p-4 max-h-48 overflow-y-auto text-xs space-y-2" id="adm-visitors-list">
+                        <!-- Dinamik -->
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -317,7 +473,7 @@ app.get('/', (req, res) => {
     </footer>
 
     <script>
-        let currentUserEmail = localStorage.getItem('ankasms_user') || 'musteri@gmail.com';
+        let currentUsername = localStorage.getItem('ankasms_username') || '';
         let selectedProductData = null;
         let currentBalance = 0;
 
@@ -347,12 +503,14 @@ app.get('/', (req, res) => {
                     \`).join('');
                 }
 
-                const bRes = await fetch(\`/api/getCustomerBalance?email=\${currentUserEmail}\`);
-                const bJson = await bRes.json();
-                if(bJson.success) {
-                    currentBalance = bJson.balance;
-                    document.getElementById('customer-balance').innerText = currentBalance.toFixed(2) + ' TL';
-                    if(bJson.name) document.getElementById('user-profile-text').innerText = bJson.name;
+                if(currentUsername) {
+                    document.getElementById('user-profile-text').innerText = currentUsername;
+                    const bRes = await fetch(\`/api/getCustomerBalance?username=\${currentUsername}\`);
+                    const bJson = await bRes.json();
+                    if(bJson.success) {
+                        currentBalance = bJson.balance;
+                        document.getElementById('customer-balance').innerText = currentBalance.toFixed(2) + ' TL';
+                    }
                 }
             } catch(e) { console.error(e); }
         }
@@ -361,6 +519,11 @@ app.get('/', (req, res) => {
         let checkInterval = null;
 
         function openOrderModal(product) {
+            if(!currentUsername) {
+                alert('Lütfen önce giriş yapın veya kayıt olun!');
+                openAuthModal();
+                return;
+            }
             selectedProductData = product;
             document.getElementById('modal-product-title').innerText = product.name + ' Satın Al';
             document.getElementById('modal-product-price').innerText = product.price + ' TL';
@@ -385,7 +548,7 @@ app.get('/', (req, res) => {
                 const res = await fetch('/api/buyNumber', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ productKey: selectedProductData.id, email: currentUserEmail })
+                    body: JSON.stringify({ productKey: selectedProductData.id, username: currentUsername })
                 });
                 const json = await res.json();
 
@@ -448,17 +611,17 @@ app.get('/', (req, res) => {
 
         async function handleLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('login-email').value;
+            const username = document.getElementById('login-username').value;
             const password = document.getElementById('login-password').value;
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ username, password })
             });
             const json = await res.json();
             if(json.success) {
-                currentUserEmail = json.email;
-                localStorage.setItem('ankasms_user', currentUserEmail);
+                currentUsername = json.username;
+                localStorage.setItem('ankasms_username', currentUsername);
                 alert(json.message);
                 closeAuthModal();
                 fetchInitialData();
@@ -467,18 +630,17 @@ app.get('/', (req, res) => {
 
         async function handleRegister(e) {
             e.preventDefault();
-            const name = document.getElementById('reg-name').value;
-            const email = document.getElementById('reg-email').value;
+            const username = document.getElementById('reg-username').value;
             const password = document.getElementById('reg-password').value;
             const res = await fetch('/api/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, password })
+                body: JSON.stringify({ username, password })
             });
             const json = await res.json();
             if(json.success) {
-                currentUserEmail = json.email;
-                localStorage.setItem('ankasms_user', currentUserEmail);
+                currentUsername = json.username;
+                localStorage.setItem('ankasms_username', currentUsername);
                 alert(json.message);
                 closeAuthModal();
                 fetchInitialData();
@@ -487,12 +649,85 @@ app.get('/', (req, res) => {
 
         function openDepositModal() { document.getElementById('deposit-modal').classList.remove('hidden'); }
         function closeDepositModal() { document.getElementById('deposit-modal').classList.add('hidden'); }
-        function sendDepositNotice() {
-            const name = document.getElementById('dep-name').value;
+        
+        async function sendDepositNotice() {
+            if(!currentUsername) { alert('Lütfen önce giriş yapın.'); openAuthModal(); return; }
+            const senderName = document.getElementById('dep-sender').value;
             const amount = document.getElementById('dep-amount').value;
-            if(!name || !amount) { alert('Lütfen tüm alanları doldurun.'); return; }
-            alert('Ödeme bildiriminiz Resul Sakal adına Garanti Bankası hesabına iletildi. Admin onayından sonra bakiyenize yansıtılacaktır.');
-            closeDepositModal();
+            if(!senderName || !amount) { alert('Lütfen tüm alanları doldurun.'); return; }
+
+            const res = await fetch('/api/deposit/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUsername, senderName, amount })
+            });
+            const json = await res.json();
+            if(json.success) {
+                alert(json.message);
+                closeDepositModal();
+            } else { alert(json.message); }
+        }
+
+        function openAdminModal() { document.getElementById('admin-modal').classList.remove('hidden'); }
+        function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
+
+        async function loadAdminPanel() {
+            const pass = document.getElementById('admin-pass-input').value;
+            if(pass !== 'aklomanti') { alert('Hatalı şifre!'); return; }
+
+            try {
+                const res = await fetch('/api/admin/data');
+                const json = await res.json();
+                if(json.success) {
+                    document.getElementById('admin-login-screen').classList.add('hidden');
+                    document.getElementById('admin-dashboard').classList.remove('hidden');
+
+                    document.getElementById('adm-vis-count').innerText = json.visitorsCount;
+                    document.getElementById('adm-user-count').innerText = json.usersCount;
+                    document.getElementById('adm-dep-count').innerText = json.depositRequests.filter(d => d.status === 'Bekliyor').length;
+
+                    // Tablo doldur
+                    const tbody = document.getElementById('adm-deposit-table');
+                    tbody.innerHTML = json.depositRequests.map(d => \`
+                        <tr class="border-b border-slate-800">
+                            <td class="p-3 text-white font-bold">\${d.username}</td>
+                            <td class="p-3 text-slate-300">\${d.senderName}</td>
+                            <td class="p-3 text-emerald-400 font-bold">\${d.amount} TL</td>
+                            <td class="p-3">
+                                <span class="px-2 py-1 rounded-lg text-[10px] font-bold \${d.status === 'Bekliyor' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : d.status === 'Onaylandı' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}">\${d.status}</span>
+                            </td>
+                            <td class="p-3 text-right space-x-1">
+                                \${d.status === 'Bekliyor' ? \`
+                                    <button onclick="adminAction(\${d.id}, 'approve')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg font-bold">Onayla</button>
+                                    <button onclick="adminAction(\${d.id}, 'reject')" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg font-bold">Reddet</button>
+                                \` : '<span class="text-slate-500">Tamamlandı</span>'}
+                            </td>
+                        </tr>
+                    \`).join('');
+
+                    // Ziyaretçiler
+                    const vList = document.getElementById('adm-visitors-list');
+                    vList.innerHTML = json.recentVisitors.map(v => \`
+                        <div class="flex justify-between items-center bg-slate-950/40 p-2 rounded-xl">
+                            <span class="text-slate-300 font-mono">IP: \${v.ip}</span>
+                            <span class="text-slate-500">\${v.time}</span>
+                        </div>
+                    \`).join('');
+                }
+            } catch(e) { alert('Admin verileri alınamadı.'); }
+        }
+
+        async function adminAction(actionId, decision) {
+            const res = await fetch('/api/admin/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: 'aklomanti', actionId, decision })
+            });
+            const json = await res.json();
+            if(json.success) {
+                alert(json.message);
+                loadAdminPanel();
+            } else { alert(json.message); }
         }
     </script>
 </body>
