@@ -1,613 +1,324 @@
-const express = require('express');
-const axios = require('axios');
-const app = express();
-const PORT = process.env.PORT || 3000;
+import os
+import threading
+import http.server
+import socketserver
+import logging
+import httpx
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+PORT = int(os.environ.get("PORT", 10000))
 
-const API_KEY = process.env.API_KEY || 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
-const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
+class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ANKA VIP Ultimate SMS Bot is running perfectly!")
 
-// Telegram Bot Bilgileri
-const TELEGRAM_BOT_TOKEN = '8874989367:AAFLCBRvCV5UIP9JOQwpvY9ZzDLVSIKYIhM';
-const TELEGRAM_CHAT_ID = '8964930489';
+def run_web_server():
+    with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
+        httpd.serve_forever()
 
-async function sendTelegramNotification(message) {
-    try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-        await axios.post(url, {
-            chat_id: TELEGRAM_CHAT_ID,
-            text: message,
-            parse_mode: 'HTML'
-        });
-    } catch (error) {
-        console.error('Telegram bildirim hatası:', error.message);
+threading.Thread(target=run_web_server, daemon=True).start()
+
+BOT_TOKEN = "8874989367:AAHTmD5Lq_jJxb3KwuJJx31vhzNGt_fQ6YU"
+IBAN = "TR62 0006 2000 5000 0006 8107 73"
+RECIPIENT = "Resul Sakal"
+SUPPORT_USERNAME = "SMSPATRONUM"
+
+# Sizin Telegram ID'niz buraya entegre edildi
+ADMIN_USER_ID = 8964930489
+
+SMS_API_KEY = "osms_ff02e69d0bdd0ddf9106b60644059c77df21bb3b5a738a9e"
+SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
+
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
+
+SERVICES = {
+    "ph_wp": {
+        "name": "🔥 Filipinler WhatsApp",
+        "code": "whatsapp",
+        "countries": ["philippines", "indonesia", "vietnam", "malaysia", "russia", "0"],
+        "price_tl": 200
+    },
+    "uk_wp": {
+        "name": "🇬🇧 İngiltere WhatsApp",
+        "code": "whatsapp",
+        "countries": ["uk", "england", "russia", "romania", "0"],
+        "price_tl": 150
+    },
+    "uk_tg": {
+        "name": "🇬🇧 İngiltere Telegram",
+        "code": "telegram",
+        "countries": ["uk", "england", "russia", "kazakhstan", "0"],
+        "price_tl": 150
+    },
+    "tr_tg": {
+        "name": "🇹🇷 TR Telegram",
+        "code": "telegram",
+        "countries": ["turkey", "russia", "kazakhstan", "0"],
+        "price_tl": 200
+    },
+    "tr_wp": {
+        "name": "🇹🇷 TR WhatsApp",
+        "code": "whatsapp",
+        "countries": ["turkey", "russia", "0"],
+        "price_tl": 300
+    },
+    "tr_ig": {
+        "name": "📸 TR Instagram",
+        "code": "instagram",
+        "countries": ["turkey", "russia", "0"],
+        "price_tl": 60
+    },
+    "tr_fb": {
+        "name": "📘 TR Facebook",
+        "code": "facebook",
+        "countries": ["turkey", "russia", "0"],
+        "price_tl": 50
+    },
+    "tr_go": {
+        "name": "🌐 TR Google / Gmail",
+        "code": "google",
+        "countries": ["turkey", "russia", "0"],
+        "price_tl": 30
     }
 }
 
-// Bellek Veritabanı
-let users = {
-    "aklomanti": { balance: 1500.00, password: "123" }
-};
+def main_menu():
+    keyboard = []
+    for key, info in SERVICES.items():
+        keyboard.append([InlineKeyboardButton(f"{info['name']} — {info['price_tl']} TL", callback_data=f"iban_{key}")])
+    keyboard.append([InlineKeyboardButton("📞 Canlı Destek", url=f"https://t.me/{SUPPORT_USERNAME}")])
+    return InlineKeyboardMarkup(keyboard)
 
-let visitorsCount = 0;
-let recentVisitors = [];
-let depositRequests = [];
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        text = (
+            "💎 *ANKA VIP — PREMIUM SMS ONAY SERVİSİ*\n\n"
+            "⚡ Kesintisiz Otomatik Numara Tedariği\n"
+            "Aşağıdaki menüden almak istediğiniz güvenli servisi seçebilirsiniz."
+        )
+        if update.message:
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
+        elif update.callback_query:
+            await update.callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu())
+    except Exception as e:
+        logging.error(f"Start komutu hatası: {e}")
 
-// GÜNCELLENMİŞ KATALOG (Telegram TR, Telegram İngiltere ve WhatsApp servisleri)
-const ankaCatalog = [
-    { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, category: "WhatsApp", icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
-    { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 200, category: "Telegram", icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
-    { id: "tg_uk", service: "tg", country: "2", name: "Telegram İngiltere", price: 180, category: "Telegram", icon: "fa-telegram", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
-    { id: "wa_uk", service: "wa", country: "2", name: "WhatsApp İngiltere", price: 200, category: "WhatsApp", icon: "fa-whatsapp", color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40" },
-    { id: "wa_ph", service: "wa", country: "4", name: "WhatsApp Filipinler", price: 150, category: "WhatsApp", icon: "fa-whatsapp", color: "text-teal-400", bg: "bg-teal-500/15", border: "border-teal-500/40" }
-];
+async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        if update.message and update.message.text:
+            text = (
+                "💎 *ANKA VIP — PREMIUM SMS ONAY SERVİSİ*\n\n"
+                "⚡ Lütfen menüden bir servis seçin veya ödeme dekontunuzu doğrudan gönderin."
+            )
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
+    except Exception as e:
+        logging.error(f"Metin mesajı işleme hatası: {e}")
 
-app.use((req, res, next) => {
-    if (req.path === '/' && req.method === 'GET') {
-        visitorsCount++;
-        recentVisitors.push({ ip: req.ip || '127.0.0.1', time: new Date().toLocaleTimeString('tr-TR') });
-        if(recentVisitors.length > 20) recentVisitors.shift();
-    }
-    next();
-});
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        query = update.callback_query
+        await query.answer()
+        data = query.data
 
-app.get('/api/getServices', (req, res) => {
-    res.json({ success: true, services: ankaCatalog });
-});
+        if data.startswith("iban_"):
+            service_key = data.replace("iban_", "")
+            service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
+            
+            context.user_data["selected_service"] = service_key
 
-app.get('/api/getCustomerBalance', (req, res) => {
-    const username = req.query.username || "misafir";
-    if (!users[username]) {
-        return res.json({ success: true, balance: 0.00, name: username });
-    }
-    res.json({ success: true, balance: users[username].balance, name: username });
-});
+            text = (
+                f"💳 *IBAN İLE ÖDEME EKRANI*\n\n"
+                f"📦 Ürün: *{service_info['name']}*\n"
+                f"💰 Tutar: *{service_info['price_tl']} TL*\n\n"
+                f"IBAN:\n`{IBAN}`\n\n"
+                f"Alıcı: *{RECIPIENT}*\n\n"
+                "━━━━━━━━━━━━━━━━\n"
+                f"1️⃣ Yukarıdaki hesaba tam *{service_info['price_tl']} TL* gönderin.\n"
+                "2️⃣ Ödeme yaptıktan sonra banka dekontunun ekran görüntüsünü veya dosyasını **doğrudan bu sohbete gönderin**."
+            )
+            keyboard = [[InlineKeyboardButton("⬅️ Geri", callback_data="home")]]
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
-app.post('/api/auth/login', (req, res) => {
-    const { username, password } = req.body;
-    if (users[username] && users[username].password === password) {
-        res.json({ success: true, message: 'Giriş başarılı!', username, balance: users[username].balance });
-    } else {
-        res.status(400).json({ success: false, message: 'Kullanıcı adı veya şifre hatalı!' });
-    }
-});
+        elif data.startswith("approve_"):
+            parts = data.split("_")
+            target_user_id = int(parts[1])
+            service_key = parts[2]
+            service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
 
-app.post('/api/auth/register', (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-        return res.status(400).json({ success: false, message: 'Lütfen tüm alanları doldurun.' });
-    }
-    if (users[username]) {
-        return res.status(400).json({ success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
-    }
-    users[username] = { password, balance: 25.00 };
-    res.json({ success: true, message: 'Kayıt başarılı! 25 TL bonus hesabınıza eklendi.', username, balance: 25.00 });
-});
+            await query.edit_message_text("🔄 Ödeme onaylandı, stok havuzu taranıyor ve numara çekiliyor...")
 
-// NUMARA ÇEKME
-app.post('/api/buyNumber', async (req, res) => {
-    const { productKey, username } = req.body;
-    
-    if (!users[username]) {
-        return res.status(400).json({ success: false, message: 'Oturum bulunamadı. Lütfen giriş yapın.' });
-    }
+            number, activation_id, country_used = await fetch_number_with_fallback(service_info["code"], service_info["countries"])
 
-    const product = ankaCatalog.find(s => s.id === productKey);
-    if (!product) {
-        return res.status(400).json({ success: false, message: 'Ürün bulunamadı.' });
-    }
+            if number:
+                await query.edit_message_text(
+                    f"✅ *Ödeme Onaylandı ve Numara Başarıyla Verildi!*\n"
+                    f"👤 Kullanıcı ID: `{target_user_id}`\n"
+                    f"📱 Numara: `{number}`",
+                    parse_mode="Markdown"
+                )
 
-    if (users[username].balance < product.price) {
-        return res.status(400).json({ 
-            success: false, 
-            message: `Bakiyeniz yetersiz! Bu servis ${product.price} TL, sizin bakiyeniz ${users[username].balance.toFixed(2)} TL.` 
-        });
-    }
+                user_text = (
+                    f"✅ *Ödemeniz Yönetici Tarafından Onaylandı!*\n\n"
+                    f"📦 Ürün: *{service_info['name']}*\n"
+                    f"🌍 Ülke: `{country_used.upper()}`\n"
+                    f"📱 *Numara:* `{number}`\n"
+                    f"🆔 *İşlem ID:* `{activation_id}`"
+                )
+                try:
+                    await context.bot.send_message(chat_id=target_user_id, text=user_text, parse_mode="Markdown")
+                except Exception as ex:
+                    logging.error(f"Kullanıcıya numara iletilemedi: {ex}")
+            else:
+                keyboard_retry = [[InlineKeyboardButton("🔄 Tekrar Dene / Stok Yenile", callback_data=f"approve_{target_user_id}_{service_key})]]
+                await query.edit_message_text(
+                    f"⚠️ Ödeme onaylandı ancak anlık olarak stok bulunamadı (`NO_NUMBERS`). Lütfen tekrar deneyin.",
+                    reply_markup=InlineKeyboardMarkup(keyboard_retry),
+                    parse_mode="Markdown"
+                )
 
-    try {
-        const apiCallUrl = `${API_URL}?api_key=${API_KEY}&action=getNumber&service=${product.service}&country=${product.country}`;
-        const response = await axios.get(apiCallUrl);
-        const resultText = response.data;
+        elif data.startswith("reject_"):
+            target_user_id = int(data.split("_")[1])
+            await query.edit_message_text("❌ Ödeme reddedildi.")
+            try:
+                await context.bot.send_message(
+                    chat_id=target_user_id,
+                    text="❌ *Ödeme Bildiriminiz Reddedildi.*\n\nLütfen geçerli bir dekont gönderdiğinizden emin olun.",
+                    parse_mode="Markdown"
+                )
+            except Exception as ex:
+                logging.error(f"Kullanıcıya ret bildirimi gönderilemedi: {ex}")
 
-        if (typeof resultText === 'string' && resultText.startsWith('ACCESS_NUMBER')) {
-            users[username].balance -= product.price;
-            const parts = resultText.split(':');
-            return res.json({
-                success: true,
-                activationId: parts[1],
-                phoneNumber: parts[2],
-                remainingBalance: users[username].balance,
-                productName: product.name,
-                message: 'Numara başarıyla alındı!'
-            });
-        } else {
-            return res.status(400).json({ success: false, message: `Tedarikçi Stok Durumu: ${resultText}` });
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Onayla SMS API bağlantı hatası.', error: error.message });
-    }
-});
+        elif data.startswith("refresh_num_"):
+            service_key = data.replace("refresh_num_", "")
+            service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
+            
+            await query.edit_message_text("🔄 Stok havuzları yeniden taranıyor...")
+            
+            number, activation_id, country_used = await fetch_number_with_fallback(service_info["code"], service_info["countries"])
+            
+            if number:
+                text = (
+                    f"✅ *Yeni Numara Başarıyla Tanımlandı!*\n\n"
+                    f"📦 Ürün: *{service_info['name']}*\n"
+                    f"🌍 Bölge/Ülke: `{country_used.upper()}`\n"
+                    f"📱 *Yeni Numara:* `{number}`\n"
+                    f"🆔 *İşlem ID:* `{activation_id}`"
+                )
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Stokları Yenile / Değiştir", callback_data=f"refresh_num_{service_key}")],
+                    [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]
+                ]
+                await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            else:
+                text = (
+                    f"⚠️ *Anlık olarak stok bulunamadı (NO_NUMBERS).* \n\n"
+                    f"Lütfen birazdan tekrar 'Tekrar Dene' butonuna basın veya canlı desteğe bildirin."
+                )
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Tekrar Dene", callback_data=f"refresh_num_{service_key}")],
+                    [InlineKeyboardButton("📞 Canlı Destek", url=f"https://t.me/{SUPPORT_USERNAME}")],
+                    [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]
+                ]
+                await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
-// KOD KONTROLÜ
-app.get('/api/checkSms/:activationId', async (req, res) => {
-    const { activationId } = req.params;
-    try {
-        const response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getStatus&id=${activationId}`);
-        const resultText = response.data;
+        elif data == "home":
+            text = (
+                "💎 *ANKA VIP — PREMIUM SMS ONAY SERVİSİ*\n\n"
+                "⚡ Kesintisiz Otomatik Numara Tedariği\n"
+                "Aşağıdaki menüden almak istediğiniz güvenli servisi seçebilirsiniz."
+            )
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
+    except Exception as e:
+        logging.error(f"Buton işleme hatası: {e}")
 
-        if (typeof resultText === 'string' && resultText.startsWith('STATUS_OK')) {
-            return res.json({ success: true, status: 'completed', code: resultText.split(':')[1] });
-        } else if (resultText === 'STATUS_WAIT_CODE') {
-            return res.json({ success: true, status: 'waiting', message: 'Kod bekleniyor...' });
-        } else {
-            return res.json({ success: true, status: resultText, message: resultText });
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'SMS durumu kontrol edilemedi.', error: error.message });
-    }
-});
-
-app.post('/api/deposit/notify', async (req, res) => {
-    const { username, senderName, amount } = req.body;
-    if (!senderName || !amount) {
-        return res.status(400).json({ success: false, message: 'Bilgiler eksik.' });
-    }
-
-    const newDep = {
-        id: Date.now(),
-        username: username || 'Misafir',
-        senderName,
-        amount: parseFloat(amount),
-        status: 'Bekliyor',
-        time: new Date().toLocaleString('tr-TR')
-    };
-
-    depositRequests.push(newDep);
-
-    const msg = `🔔 <b>ANKA CIA SMS - YENİ ÖDEME BİLDİRİMİ!</b>\n\n` +
-                `👤 <b>Kullanıcı:</b> ${newDep.username}\n` +
-                `💳 <b>Gönderen:</b> ${newDep.senderName}\n` +
-                `💰 <b>Tutar:</b> ${newDep.amount} TL\n` +
-                `⏱ <b>Zaman:</b> ${newDep.time}\n\n` +
-                `👉 Admin panelinden onaylayabilirsiniz!`;
-    
-    await sendTelegramNotification(msg);
-
-    res.json({ success: true, message: 'Ödeme bildiriminiz yetkiliye iletildi. İnceleniyor...' });
-});
-
-app.get('/api/admin/data', (req, res) => {
-    res.json({
-        success: true,
-        visitorsCount,
-        recentVisitors,
-        depositRequests,
-        usersCount: Object.keys(users).length
-    });
-});
-
-app.post('/api/admin/action', (req, res) => {
-    const { password, actionId, decision } = req.body;
-    if (password !== 'aklomanti') {
-        return res.status(403).json({ success: false, message: 'Yetkisiz şifre!' });
-    }
-
-    const reqIndex = depositRequests.findIndex(d => d.id === actionId);
-    if (reqIndex === -1) {
-        return res.status(404).json({ success: false, message: 'Bildirim bulunamadı.' });
-    }
-
-    const dep = depositRequests[reqIndex];
-    if (decision === 'approve') {
-        if (users[dep.username]) {
-            users[dep.username].balance += dep.amount;
-        } else {
-            users[dep.username] = { password: "123", balance: dep.amount };
-        }
-        dep.status = 'Onaylandı';
-    } else {
-        dep.status = 'Reddedildi';
-    }
-
-    res.json({ success: true, message: `İşlem güncellendi: ${dep.status}` });
-});
-
-// ULTRA MODERN ÖN YÜZ (HAREKETLİ MATRİX EFEKTİ VE BELİRGİN ARKA PLAN)
-app.get('/', (req, res) => {
-    res.send(`<!DOCTYPE html>
-<html lang="tr" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANKA CIA SMS HİZMETLERİ</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-        body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            background-color: #030712;
-            color: #f8fafc; 
-            overflow-x: hidden; 
-        }
-        #matrix-canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: -2;
-            opacity: 0.55;
-            pointer-events: none;
-        }
-        .bg-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: linear-gradient(rgba(3, 7, 18, 0.45), rgba(3, 7, 18, 0.65)), url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1920&auto=format&fit=crop') no-repeat center center fixed;
-            background-size: cover;
-            z-index: -1;
-            pointer-events: none;
-        }
-        .glass { background: rgba(15, 23, 42, 0.82); backdrop-filter: blur(16px); border: 1px solid rgba(34, 197, 94, 0.35); }
-        .glass-card { background: rgba(30, 41, 59, 0.70); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.15); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .glass-card:hover { transform: translateY(-6px); border-color: rgba(34, 197, 94, 0.8); box-shadow: 0 20px 40px -15px rgba(34, 197, 94, 0.4); }
-        @keyframes modalAnim { from { opacity: 0; transform: scale(0.85) translateY(30px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-        .animate-modal { animation: modalAnim 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .support-float { animation: floatAnim 3s ease-in-out infinite; }
-        @keyframes floatAnim { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-        #splash-screen { position: fixed; inset: 0; z-index: 9999; background: #030712; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.7s ease, visibility 0.7s ease; }
-        .splash-logo-box { width: 85px; height: 85px; background: linear-gradient(135deg, #10b981, #3b82f6); border-radius: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(16, 185, 129, 0.5); }
-    </style>
-</head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-600 selection:text-white">
-    <canvas id="matrix-canvas"></canvas>
-    <div class="bg-overlay"></div>
-
-    <div id="splash-screen">
-        <div class="splash-logo-box mb-5 relative z-10"><i class="fa-solid fa-terminal text-white text-3xl"></i></div>
-        <h1 class="text-xl sm:text-2xl font-extrabold tracking-wider bg-gradient-to-r from-emerald-400 via-teal-300 to-white bg-clip-text text-transparent relative z-10">ANKA CIA SMS</h1>
-        <p class="text-[11px] text-slate-400 mt-2 tracking-widest uppercase relative z-10">Güvenli Altyapı Yükleniyor...</p>
-    </div>
-
-    <header class="glass sticky top-0 z-40 border-b border-emerald-500/30 px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center space-x-3 cursor-pointer" onclick="location.reload()">
-            <div class="w-10 h-10 bg-gradient-to-tr from-emerald-600 via-teal-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                <i class="fa-solid fa-shield-halved text-white text-lg"></i>
-            </div>
-            <div>
-                <span class="font-extrabold text-base tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-white bg-clip-text text-transparent">ANKA CIA SMS</span>
-                <span class="block text-[9px] text-emerald-400 font-extrabold tracking-widest">GÜVENLİ ONAY SİSTEMİ</span>
-            </div>
-        </div>
-        <div class="flex items-center space-x-2.5">
-            <div class="glass px-3.5 py-2 rounded-2xl flex items-center space-x-2 text-xs border-emerald-500/30 shadow-inner">
-                <i class="fa-solid fa-wallet text-emerald-400"></i>
-                <span class="text-slate-400 hidden sm:inline">Bakiye:</span>
-                <span id="customer-balance" class="font-extrabold text-emerald-400 text-xs sm:text-sm">0.00 TL</span>
-            </div>
-            <button onclick="openDepositModal()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-600/25">
-                <i class="fa-solid fa-plus mr-1"></i> Bakiye Yükle
-            </button>
-            <button onclick="openAuthModal()" class="glass hover:bg-slate-800 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition border border-slate-700 flex items-center space-x-1.5">
-                <i class="fa-solid fa-user-circle text-emerald-400 text-sm"></i>
-                <span id="user-profile-text" class="hidden sm:inline">Giriş Yap</span>
-            </button>
-            <button onclick="openAdminModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-2 rounded-xl text-xs font-bold transition border border-amber-500/30" title="Admin">
-                <i class="fa-solid fa-shield-halved"></i>
-            </button>
-        </div>
-    </header>
-
-    <main class="max-w-5xl mx-auto px-4 py-10 w-full flex-grow">
-        <div class="relative overflow-hidden glass p-8 rounded-3xl mb-10 border border-emerald-500/35 bg-gradient-to-r from-slate-950/80 via-slate-900/90 to-emerald-950/50 shadow-2xl">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
-                <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Anında Sanal Numara Al</h1>
-                <span class="text-lg sm:text-2xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-blue-400 drop-shadow-md">ANKA CIA SMS HİZMETLERİ</span>
-            </div>
-            <p class="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">WhatsApp ve Telegram servisleriniz için anlık havuzdan numara çekin, kodunuzu saniyeler içinde ekranda görün.</p>
-        </div>
-
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
-            <div class="relative w-full sm:w-80">
-                <i class="fa-solid fa-search absolute left-4 top-3.5 text-slate-400 text-xs"></i>
-                <input type="text" id="search-input" oninput="filterServices()" placeholder="" class="w-full bg-slate-900/90 border border-slate-700 rounded-2xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500 transition">
-            </div>
-            <div class="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0" id="category-filters">
-                <button onclick="filterCategory('Tümü')" class="cat-btn bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Tümü</button>
-                <button onclick="filterCategory('WhatsApp')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">WhatsApp</button>
-                <button onclick="filterCategory('Telegram')" class="cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0">Telegram</button>
-            </div>
-        </div>
-
-        <div id="services-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-6 mb-12"></div>
-    </main>
-
-    <a href="https://t.me/SMSPATRONUM" target="_blank" class="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-3.5 rounded-full shadow-2xl flex items-center justify-center text-lg support-float border border-emerald-400/40" title="Canlı Destek">
-        <i class="fa-brands fa-telegram"></i>
-    </a>
-
-    <!-- Order Modal -->
-    <div id="order-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="glass w-full max-w-md rounded-3xl p-7 border border-emerald-500/40 relative animate-modal shadow-2xl">
-            <button onclick="closeOrderModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-8 h-8 rounded-xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
-            <div id="order-step-1">
-                <h3 id="modal-product-title" class="text-lg font-extrabold text-white mb-2">Servis Adı</h3>
-                <div class="bg-slate-900/90 p-4 rounded-2xl border border-emerald-500/20 mb-6 space-y-2 text-xs">
-                    <div class="flex justify-between"><span class="text-slate-400">Servis Ücreti:</span> <span id="modal-product-price" class="font-extrabold text-emerald-400 text-sm">0 TL</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">Mevcut Bakiyeniz:</span> <span id="modal-user-balance" class="font-extrabold text-white">0 TL</span></div>
-                </div>
-                <button onclick="executeBuy()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-lg shadow-emerald-600/30">Numarayı Havuzdan Çek ve Başlat</button>
-            </div>
-            <div id="order-step-2" class="hidden space-y-4">
-                <div class="bg-emerald-500/10 border border-emerald-500/30 p-3.5 rounded-2xl text-emerald-400 font-bold text-xs text-center">Numara Başarıyla Tahsis Edildi!</div>
-                <div class="bg-slate-900 p-4 rounded-2xl text-center">
-                    <span class="text-[10px] uppercase text-slate-400 tracking-wider block mb-1">Telefon Numarası</span>
-                    <div id="res-phone" class="text-xl font-extrabold text-white font-mono tracking-wide">+90 ...</div>
-                </div>
-                <div class="bg-slate-900 p-4 rounded-2xl text-center">
-                    <span class="text-[10px] uppercase text-slate-400 tracking-wider block mb-1">Gelen SMS Kodu</span>
-                    <div id="res-code" class="text-2xl font-extrabold text-emerald-400 font-mono animate-pulse">Kod Bekleniyor...</div>
-                </div>
-                <button onclick="closeOrderModal(); location.reload();" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-2xl text-xs font-bold transition">İşlemi Tamamla & Kapat</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="glass w-full max-w-sm rounded-3xl p-7 border border-emerald-500/40 relative animate-modal shadow-2xl">
-            <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-8 h-8 rounded-xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
-            <div class="flex space-x-1.5 mb-6 bg-slate-900 p-1 rounded-2xl">
-                <button onclick="switchAuthTab('login')" id="tab-login-btn" class="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white transition">Giriş Yap</button>
-                <button onclick="switchAuthTab('register')" id="tab-register-btn" class="flex-1 py-2 rounded-xl text-xs font-bold text-slate-400 transition">Kayıt Ol</button>
-            </div>
-            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-3.5">
-                <input type="text" id="login-username" placeholder="Kullanıcı Adı" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
-                <input type="password" id="login-password" autocomplete="new-password" value="" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-emerald-600/30">Giriş Yap</button>
-            </form>
-            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-3.5 hidden">
-                <input type="text" id="reg-username" placeholder="Kullanıcı Adı" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
-                <input type="password" id="reg-password" autocomplete="new-password" placeholder="Şifre" required class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-emerald-600/30">Kayıt Ol (+25 TL Bonus)</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Deposit Modal -->
-    <div id="deposit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="glass w-full max-w-sm rounded-3xl p-7 border border-emerald-500/40 relative animate-modal shadow-2xl">
-            <button onclick="closeDepositModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-8 h-8 rounded-xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
-            <h3 class="text-sm font-extrabold text-white mb-2">Bakiye Yükleme Bildirimi</h3>
-            <div class="bg-slate-950 p-3.5 rounded-2xl border border-emerald-500/20 mb-4 text-[11px] space-y-1.5">
-                <div class="flex justify-between"><span class="text-slate-400">Alıcı:</span> <span class="text-emerald-400 font-bold">Resul Sakal</span></div>
-                <div class="flex justify-between"><span class="text-slate-400">IBAN:</span> <span class="text-emerald-300 font-mono">TR62 0006 2000 5000 0006 8107 73</span></div>
-            </div>
-            <div class="space-y-3">
-                <input type="text" id="dep-sender" placeholder="Gönderen Adı Soyadı" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
-                <input type="number" id="dep-amount" placeholder="Yatırılan Tutar (TL)" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500">
-                <button onclick="sendDepositNotice()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-lg shadow-emerald-600/30">Ödeme Bildirimi Gönder</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Admin Modal -->
-    <div id="admin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="glass w-full max-w-3xl rounded-3xl p-6 border border-amber-500/40 relative animate-modal shadow-2xl max-h-[85vh] overflow-y-auto">
-            <button onclick="closeAdminModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-8 h-8 rounded-xl bg-slate-800/80 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
-            <div id="admin-login-screen">
-                <h3 class="text-lg font-extrabold text-white mb-3">Admin Panel Girişi</h3>
-                <input type="password" id="admin-pass-input" autocomplete="new-password" value="" placeholder="Admin Şifresi" class="w-full max-w-xs bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white mb-3 focus:outline-none focus:border-amber-500">
-                <button onclick="loadAdminPanel()" class="w-full max-w-xs bg-amber-600 hover:bg-amber-500 text-white font-extrabold py-3 rounded-2xl text-xs transition block shadow-lg shadow-amber-600/25">Giriş Yap</button>
-            </div>
-            <div id="admin-dashboard" class="hidden space-y-5">
-                <h3 class="text-lg font-extrabold text-amber-400">Yönetim Paneli & Onay Kuyruğu</h3>
-                <div class="grid grid-cols-3 gap-3">
-                    <div class="bg-slate-900 p-3.5 rounded-2xl border border-slate-800"><span class="text-[10px] uppercase text-slate-400 block">Ziyaretçi</span><span id="adm-vis-count" class="text-lg font-bold text-white">0</span></div>
-                    <div class="bg-slate-900 p-3.5 rounded-2xl border border-slate-800"><span class="text-[10px] uppercase text-slate-400 block">Kullanıcı</span><span id="adm-user-count" class="text-lg font-bold text-emerald-400">0</span></div>
-                    <div class="bg-slate-900 p-3.5 rounded-2xl border border-slate-800"><span class="text-[10px] uppercase text-slate-400 block">Bekleyen Ödeme</span><span id="adm-dep-count" class="text-lg font-bold text-amber-400">0</span></div>
-                </div>
-                <div class="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800">
-                    <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-800 text-slate-400"><tr><th class="p-3">Kullanıcı</th><th class="p-3">Gönderen</th><th class="p-3">Tutar</th><th class="p-3">Durum</th><th class="p-3 text-right">İşlem</th></tr></thead>
-                        <tbody id="adm-deposit-table"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <footer class="glass border-t border-emerald-500/30 text-center py-6 text-[11px] text-slate-500">&copy; 2026 ANKA CIA SMS HİZMETLERİ - Tüm Hakları Saklıdır.</footer>
-
-    <script>
-        // Matrix Yağmur Efekti
-        const canvas = document.getElementById('matrix-canvas');
-        const ctx = canvas.getContext('2d');
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        const chars = '0101010101010101ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%&*+';
-        const fontSize = 14;
-        let columns = canvas.width / fontSize;
-        let drops = [];
-        for(let i = 0; i < columns; i++) { drops[i] = 1; }
-
-        function drawMatrix() {
-            ctx.fillStyle = 'rgba(3, 7, 18, 0.08)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#10b981';
-            ctx.font = fontSize + 'px monospace';
-            for(let i = 0; i < drops.length; i++) {
-                const text = chars.charAt(Math.floor(Math.random() * chars.length));
-                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                if(drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                    drops[i] = 0;
-                }
-                drops[i]++;
+async def fetch_number_with_fallback(service_code, countries_list):
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    async with httpx.AsyncClient(timeout=10.0, headers=headers, follow_redirects=True) as client:
+        for country in countries_list:
+            params = {
+                "api_key": SMS_API_KEY,
+                "action": "getNumber",
+                "service": service_code,
+                "country": country
             }
-        }
-        setInterval(drawMatrix, 35);
-
-        window.addEventListener('load', () => { setTimeout(() => { const s = document.getElementById('splash-screen'); s.style.opacity = '0'; setTimeout(() => s.style.display = 'none', 700); }, 1000); });
-        let currentUsername = localStorage.getItem('sms_username') || '';
-        let selectedProductData = null, currentBalance = 0, allServicesData = [], currentCategory = 'Tümü', checkInterval = null;
-
-        async function fetchInitialData() {
-            try {
-                const sRes = await fetch('/api/getServices');
-                const sJson = await sRes.json();
-                if(sJson.success) { allServicesData = sJson.services; renderServices(allServicesData); }
-                if(currentUsername) {
-                    document.getElementById('user-profile-text').innerText = currentUsername;
-                    const bRes = await fetch(\`/api/getCustomerBalance?username=\${currentUsername}\`);
-                    const bJson = await bRes.json();
-                    if(bJson.success) { currentBalance = bJson.balance; document.getElementById('customer-balance').innerText = currentBalance.toFixed(2) + ' TL'; }
-                }
-            } catch(e) {}
-        }
-        fetchInitialData();
-
-        function renderServices(services) {
-            const grid = document.getElementById('services-grid');
-            if(services.length === 0) {
-                grid.innerHTML = \`<div class="col-span-full text-center py-12 text-slate-500 text-xs">Aradığınız kriterlere uygun servis bulunamadı.</div>\`;
-                return;
-            }
-            grid.innerHTML = services.map(s => \`
-                <div class="glass-card p-6 rounded-3xl flex flex-col justify-between \${s.border}">
-                    <div>
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="w-12 h-12 \${s.bg} rounded-2xl flex items-center justify-center \${s.color} text-xl"><i class="fa-brands \${s.icon}"></i></div>
-                            <span class="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400">\${s.price} TL</span>
-                        </div>
-                        <span class="text-[9px] uppercase font-bold tracking-widest text-slate-400 mb-1 block">\${s.category}</span>
-                        <h3 class="text-base font-extrabold text-white mb-2">\${s.name}</h3>
-                        <p class="text-xs text-slate-400">Anlık havuzdan hızlı SMS doğrulaması.</p>
-                    </div>
-                    <button onclick='openOrderModal(\${JSON.stringify(s)})' class="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-md shadow-emerald-600/20">Numara Satın Al</button>
-                </div>
-            \`).join('');
-        }
-
-        function filterCategory(cat) {
-            currentCategory = cat;
-            document.querySelectorAll('.cat-btn').forEach(btn => {
-                if(btn.innerText.includes(cat)) {
-                    btn.className = "cat-btn bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0";
-                } else {
-                    btn.className = "cat-btn bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition flex-shrink-0";
-                }
-            });
-            filterServices();
-        }
-
-        function filterServices() {
-            const q = document.getElementById('search-input').value.toLowerCase();
-            let filtered = allServicesData;
-            if(currentCategory !== 'Tümü') {
-                filtered = filtered.filter(s => s.category === currentCategory);
-            }
-            if(q) {
-                filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
-            }
-            renderServices(filtered);
-        }
-
-        function openOrderModal(product) {
-            if(!currentUsername) { alert('Lütfen önce giriş yapın!'); openAuthModal(); return; }
-            selectedProductData = product;
-            document.getElementById('modal-product-title').innerText = product.name;
-            document.getElementById('modal-product-price').innerText = product.price + ' TL';
-            document.getElementById('modal-user-balance').innerText = currentBalance.toFixed(2) + ' TL';
-            document.getElementById('order-step-1').classList.remove('hidden');
-            document.getElementById('order-step-2').classList.add('hidden');
-            document.getElementById('order-modal').classList.remove('hidden');
-        }
-        function closeOrderModal() { document.getElementById('order-modal').classList.add('hidden'); if(checkInterval) clearInterval(checkInterval); }
-
-        async function executeBuy() {
-            const res = await fetch('/api/buyNumber', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productKey: selectedProductData.id, username: currentUsername }) });
-            const json = await res.json();
-            if(json.success) {
-                document.getElementById('order-step-1').classList.add('hidden');
-                document.getElementById('order-step-2').classList.remove('hidden');
-                document.getElementById('res-phone').innerText = json.phoneNumber;
-                document.getElementById('customer-balance').innerText = json.remainingBalance.toFixed(2) + ' TL';
-                currentBalance = json.remainingBalance;
+            try:
+                response = await client.get(SMS_API_URL, params=params)
+                res_text = response.text.strip()
+                logging.info(f"API İstek [{service_code} - Ülke: {country}] Yanıt: {res_text}")
                 
-                checkInterval = setInterval(async () => {
-                    const r = await fetch(\`/api/checkSms/\${json.activationId}\`);
-                    const j = await r.json();
-                    if(j.success && j.status === 'completed') {
-                        document.getElementById('res-code').innerText = j.code;
-                        clearInterval(checkInterval);
-                    }
-                }, 3000);
-            } else { alert(json.message); }
-        }
+                if "ACCESS_NUMBER" in res_text:
+                    parts = res_text.split(":")
+                    activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
+                    phone_number = parts[2] if len(parts) > 2 else res_text
+                    return phone_number, activation_id, country
+            except Exception as e:
+                logging.error(f"API Hatası [{country}]: {e}")
+                continue
+        return None, None, None
 
-        function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
-        function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
-        function switchAuthTab(tab) {
-            if(tab === 'login') { document.getElementById('login-form').classList.remove('hidden'); document.getElementById('register-form').classList.add('hidden'); }
-            else { document.getElementById('register-form').classList.remove('hidden'); document.getElementById('login-form').classList.add('hidden'); }
-        }
-        async function handleLogin(e) {
-            e.preventDefault();
-            const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: document.getElementById('login-username').value, password: document.getElementById('login-password').value }) });
-            const json = await res.json();
-            if(json.success) { currentUsername = json.username; localStorage.setItem('sms_username', currentUsername); closeAuthModal(); fetchInitialData(); } else { alert(json.message); }
-        }
-        async function handleRegister(e) {
-            e.preventDefault();
-            const res = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: document.getElementById('reg-username').value, password: document.getElementById('reg-password').value }) });
-            const json = await res.json();
-            if(json.success) { currentUsername = json.username; localStorage.setItem('sms_username', currentUsername); closeAuthModal(); fetchInitialData(); } else { alert(json.message); }
-        }
-        function openDepositModal() { document.getElementById('deposit-modal').classList.remove('hidden'); }
-        function closeDepositModal() { document.getElementById('deposit-modal').classList.add('hidden'); }
-        async function sendDepositNotice() {
-            const res = await fetch('/api/deposit/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUsername, senderName: document.getElementById('dep-sender').value, amount: document.getElementById('dep-amount').value }) });
-            const json = await res.json(); alert(json.message); closeDepositModal();
-        }
-        function openAdminModal() { document.getElementById('admin-pass-input').value = ''; document.getElementById('admin-modal').classList.remove('hidden'); }
-        function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
-        async function loadAdminPanel() {
-            if(document.getElementById('admin-pass-input').value !== 'aklomanti') { alert('Şifre hatalı!'); return; }
-            const res = await fetch('/api/admin/data'); const json = await res.json();
-            if(json.success) {
-                document.getElementById('admin-login-screen').classList.add('hidden');
-                document.getElementById('admin-dashboard').classList.remove('hidden');
-                document.getElementById('adm-vis-count').innerText = json.visitorsCount;
-                document.getElementById('adm-user-count').innerText = json.usersCount;
-                document.getElementById('adm-dep-count').innerText = json.depositRequests.filter(d => d.status === 'Bekliyor').length;
-                document.getElementById('adm-deposit-table').innerHTML = json.depositRequests.map(d => \`
-                    <tr class="border-b border-slate-800">
-                        <td class="p-3">\${d.username}</td><td class="p-3">\${d.senderName}</td><td class="p-3 text-emerald-400">\${d.amount} TL</td>
-                        <td class="p-3">\${d.status}</td>
-                        <td class="p-3 text-right">\${d.status === 'Bekliyor' ? \`<button onclick="adminAction(\${d.id}, 'approve')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold">Onayla</button>\` : ''}</td>
-                    </tr>
-                \`).join('');
-            }
-        }
-        async function adminAction(actionId, decision) {
-            await fetch('/api/admin/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'aklomanti', actionId, decision }) });
-            loadAdminPanel();
-        }
-    </script>
-</body>
-</html>`);
-});
+async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        if update.message and (update.message.photo or update.message.document):
+            user = update.message.from_user
+            service_key = context.user_data.get("selected_service", "ph_wp")
+            service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
 
-app.listen(PORT, () => {
-    console.log('Sunucu calisiyor, port:', PORT);
-});
+            await update.message.reply_text("📥 *Dekontunuz alındı!* Yönetici onayına gönderildi, lütfen bekleyin.")
+
+            admin_text = (
+                f"🔔 *YENİ ÖDEME BİLDİRİMİ!*\n\n"
+                f"👤 Kullanıcı: {user.full_name} (@{user.username or 'Yok'}, ID: `{user.id}`)\n"
+                f"📦 Seçilen Ürün: *{service_info['name']}* ({service_info['price_tl']} TL)\n\n"
+                f"Aşağıdaki butonları kullanarak ödemeyi onaylayabilir veya reddedebilirsiniz:"
+            )
+            admin_keyboard = [
+                [
+                    InlineKeyboardButton("✅ Onayla & Numara Ver", callback_data=f"approve_{user.id}_{service_key}"),
+                    InlineKeyboardButton("❌ Reddet", callback_data=f"reject_{user.id}")
+                ]
+            ]
+
+            if update.message.photo:
+                photo_file = update.message.photo[-1].file_id
+                await context.bot.send_photo(
+                    chat_id=ADMIN_USER_ID,
+                    photo=photo_file,
+                    caption=admin_text,
+                    reply_markup=InlineKeyboardMarkup(admin_keyboard),
+                    parse_mode="Markdown"
+                )
+            elif update.message.document:
+                doc_file = update.message.document.file_id
+                await context.bot.send_document(
+                    chat_id=ADMIN_USER_ID,
+                    document=doc_file,
+                    caption=admin_text,
+                    reply_markup=InlineKeyboardMarkup(admin_keyboard),
+                    parse_mode="Markdown"
+                )
+    except Exception as e:
+        logging.error(f"Dekont işleme hatası: {e}")
+
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message_handler))
+    
+    print("ANKA VIP Bot Tam Entegre Edildi ve Çalışıyor!")
+    app.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
