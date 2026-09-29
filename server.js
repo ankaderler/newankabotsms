@@ -9,16 +9,33 @@ app.use(express.urlencoded({ extended: true }));
 const API_KEY = process.env.API_KEY || 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
 const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
 
+// Telegram Bot Bilgilerin
+const TELEGRAM_BOT_TOKEN = '8874989367:AAFLCBRvCV5UIP9JOQwpvY9ZzDLVSIKYIhM';
+const TELEGRAM_CHAT_ID = '8964930489'; // Senin ID'n
+
+async function sendTelegramNotification(message) {
+    try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        await axios.post(url, {
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message,
+            parse_mode: 'HTML'
+        });
+    } catch (error) {
+        console.error('Telegram bildirim hatası:', error.message);
+    }
+}
+
 // Veritabanı ve Bellek Yapıları
 let users = {
-    "aklomanti": { balance: 1000.00, password: "123", name: "Resul Sakal (Admin)" }
+    "aklomanti": { balance: 1000.00, password: "123" }
 };
 
 let visitorsCount = 0;
 let recentVisitors = [];
 let depositRequests = [];
 
-// İstediğin Ürün Sıralaması ve İsimleri
+// Ürün Listesi
 const services = [
     { id: "wa_tr", service: "wa", country: "1", name: "WhatsApp Türkiye", price: 300, icon: "fa-whatsapp", color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
     { id: "tg_tr", service: "tg", country: "1", name: "Telegram Türkiye", price: 220, icon: "fa-telegram", color: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40" },
@@ -69,7 +86,7 @@ app.post('/api/auth/register', (req, res) => {
     res.json({ success: true, message: 'Kayıt başarılı! 20 TL bonus hesabınıza eklendi.', username, balance: 20.00 });
 });
 
-// Numara Satın Alma (OnaylaSMS Entegrasyonlu)
+// Numara Satın Alma
 app.post('/api/buyNumber', async (req, res) => {
     const { productKey, username } = req.body;
     
@@ -132,21 +149,35 @@ app.get('/api/checkSms/:activationId', async (req, res) => {
     }
 });
 
-// Ödeme Bildirimi Oluşturma
-app.post('/api/deposit/notify', (req, res) => {
+// Ödeme Bildirimi Oluşturma ve Telegram'a Gönderme
+app.post('/api/deposit/notify', async (req, res) => {
     const { username, senderName, amount } = req.body;
     if (!senderName || !amount) {
         return res.status(400).json({ success: false, message: 'Bilgiler eksik.' });
     }
-    depositRequests.push({
+
+    const newDep = {
         id: Date.now(),
         username: username || 'Misafir',
         senderName,
         amount: parseFloat(amount),
         status: 'Bekliyor',
         time: new Date().toLocaleString('tr-TR')
-    });
-    res.json({ success: true, message: 'Ödeme bildiriminiz başarıyla iletildi.' });
+    };
+
+    depositRequests.push(newDep);
+
+    // Telegram Bot Bildirimi Gönder
+    const msg = `🔔 <b>YENİ ÖDEME BİLDİRİMİ!</b>\n\n` +
+                `👤 <b>Kullanıcı:</b> ${newDep.username}\n` +
+                `💳 <b>Gönderen:</b> ${newDep.senderName}\n` +
+                `💰 <b>Tutar:</b> ${newDep.amount} TL\n` +
+                `⏱ <b>Zaman:</b> ${newDep.time}\n\n` +
+                `👉 Panelden onaylamak için siteye giriş yapın!`;
+    
+    await sendTelegramNotification(msg);
+
+    res.json({ success: true, message: 'Ödeme bildiriminiz başarıyla yetkiliye iletildi.' });
 });
 
 // Admin Paneli Verileri
@@ -177,7 +208,6 @@ app.post('/api/admin/action', (req, res) => {
         if (users[dep.username]) {
             users[dep.username].balance += dep.amount;
         } else {
-            // Eğer kullanıcı adı bulunamazsa ilk kayıtlı kullanıcıya ekle veya geçici oluştur
             users[dep.username] = { password: "123", balance: dep.amount };
         }
         dep.status = 'Onaylandı';
@@ -195,19 +225,23 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AnkaSMS - 4K Premium SMS Paneli</title>
+    <title>SMSPATRONUM - Premium SMS Onay Paneli</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f8fafc; overflow-x: hidden; }
-        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(24px); border: 1px solid rgba(59, 130, 246, 0.2); }
+        .glass { background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(24px); border: 1px solid rgba(59, 130, 246, 0.2); }
         .glass-card { background: rgba(30, 41, 59, 0.55); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.07); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         .glass-card:hover { transform: translateY(-6px); border-color: rgba(59, 130, 246, 0.6); box-shadow: 0 20px 40px -15px rgba(59, 130, 246, 0.3); }
-        @keyframes modalAnim { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-        .animate-modal { animation: modalAnim 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        @keyframes glow { 0%, 100% { opacity: 0.4; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } }
-        .animate-glow { animation: glow 5s ease-in-out infinite; }
+        
+        @keyframes modalAnim { from { opacity: 0; transform: scale(0.85) translateY(30px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .animate-modal { animation: modalAnim 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        @keyframes neonPulse { 0%, 100% { opacity: 0.3; transform: scale(1); filter: blur(40px); } 50% { opacity: 0.7; transform: scale(1.12); filter: blur(60px); } }
+        .neon-bg-1 { animation: neonPulse 6s ease-in-out infinite; }
+        .neon-bg-2 { animation: neonPulse 8s ease-in-out infinite reverse; }
+
         @keyframes floatAnim { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
         .support-float { animation: floatAnim 3s ease-in-out infinite; }
     </style>
@@ -218,11 +252,11 @@ app.get('/', (req, res) => {
     <header class="glass sticky top-0 z-40 border-b border-blue-900/30 px-6 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3 cursor-pointer" onclick="location.reload()">
             <div class="w-11 h-11 bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/30">
-                <i class="fa-solid fa-bolt text-white text-xl"></i>
+                <i class="fa-solid fa-crown text-white text-xl"></i>
             </div>
             <div>
-                <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">AnkaSMS</span>
-                <span class="block text-[10px] text-blue-400 font-extrabold tracking-widest">4K PREMIUM ALTYAPI</span>
+                <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">SMSPATRONUM</span>
+                <span class="block text-[10px] text-blue-400 font-extrabold tracking-widest">VIP SMS ALTYAPISI</span>
             </div>
         </div>
 
@@ -248,7 +282,7 @@ app.get('/', (req, res) => {
     <!-- Main Content -->
     <main class="max-w-6xl mx-auto px-4 py-10 w-full flex-grow">
         <div class="relative overflow-hidden glass p-8 sm:p-10 rounded-3xl mb-12 border border-blue-500/30 bg-gradient-to-r from-blue-950/50 via-slate-900/80 to-indigo-950/50 shadow-2xl">
-            <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none animate-glow"></div>
+            <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none neon-bg-1"></div>
             <h1 class="text-2xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">Anında Sanal Numara ve SMS Onay</h1>
             <p class="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">OnaylaSMS altyapısı ile tamamen otomatik çalışan sistemimizden dilediğiniz ülkeyi ve servisi seçerek anında numara kiralayın, SMS kodunuzu canlı olarak ekranda görün.</p>
         </div>
@@ -267,8 +301,8 @@ app.get('/', (req, res) => {
         </div>
     </main>
 
-    <!-- CANLI DESTEK BUTONU (Telegram Aklomanti) -->
-    <a href="https://t.me/aklomanti" target="_blank" class="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white p-4 rounded-full shadow-2xl shadow-blue-500/50 flex items-center justify-center text-xl support-float border border-blue-400/40" title="Canlı Destek ile Bağlan">
+    <!-- CANLI DESTEK BUTONU (@SMSPATRONUM) -->
+    <a href="https://t.me/SMSPATRONUM" target="_blank" class="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white p-4 rounded-full shadow-2xl shadow-blue-500/50 flex items-center justify-center text-xl support-float border border-blue-400/40" title="Canlı Destek ile Bağlan">
         <i class="fa-brands fa-telegram"></i>
     </a>
 
@@ -328,8 +362,8 @@ app.get('/', (req, res) => {
     <!-- 4K NEON ANİMASYONLU GİRİŞ / KAYIT MODALI -->
     <div id="auth-modal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
         <div class="glass w-full max-w-md rounded-3xl p-8 border border-blue-500/40 relative animate-modal shadow-2xl overflow-hidden">
-            <div class="absolute -top-12 -left-12 w-40 h-40 bg-blue-600/20 rounded-full blur-3xl pointer-events-none animate-glow"></div>
-            <div class="absolute -bottom-12 -right-12 w-40 h-40 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none animate-glow"></div>
+            <div class="absolute -top-16 -left-16 w-48 h-48 bg-blue-600/30 rounded-full blur-3xl pointer-events-none neon-bg-1"></div>
+            <div class="absolute -bottom-16 -right-16 w-48 h-48 bg-indigo-600/30 rounded-full blur-3xl pointer-events-none neon-bg-2"></div>
             
             <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-2xl bg-slate-800/80 flex items-center justify-center transition border border-slate-700 z-10"><i class="fa-solid fa-xmark text-sm"></i></button>
             
@@ -401,7 +435,7 @@ app.get('/', (req, res) => {
                     <i class="fa-solid fa-shield-halved"></i>
                 </div>
                 <h3 class="text-xl font-extrabold text-white mb-2">Admin Paneli Girişi</h3>
-                <p class="text-xs text-slate-400 mb-6">Yönetici şifrenizi girerek finans ve ziyaretçi raporlarına ulaşın.</p>
+                <p class="text-xs text-slate-400 mb-6">Yönetici şifrenizi (aklomanti) girerek finans ve ziyaretçi raporlarına ulaşın.</p>
                 <div class="space-y-4 max-w-sm">
                     <input type="password" id="admin-pass-input" placeholder="Admin Şifresi" class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-xs text-white">
                     <button onclick="loadAdminPanel()" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold py-3.5 rounded-2xl text-xs transition shadow-lg shadow-amber-600/30">Paneli Aç</button>
@@ -413,7 +447,7 @@ app.get('/', (req, res) => {
                     <div>
                         <h3 class="text-xl font-extrabold text-amber-400 flex items-center space-x-2">
                             <i class="fa-solid fa-gauge-high"></i>
-                            <span>Resul Sakal - Admin Yönetim Paneli</span>
+                            <span>SMSPATRONUM - Admin Yönetim Paneli</span>
                         </h3>
                         <p class="text-xs text-slate-400">Canlı ziyaretçiler, bekleyen ödemeler ve finansal kontroller.</p>
                     </div>
@@ -469,11 +503,11 @@ app.get('/', (req, res) => {
 
     <!-- Footer -->
     <footer class="glass border-t border-blue-900/30 text-center py-6 text-xs text-slate-500">
-        &copy; 2026 AnkaSMS - Tüm Hakları Saklıdır.
+        &copy; 2026 SMSPATRONUM - Tüm Hakları Saklıdır.
     </footer>
 
     <script>
-        let currentUsername = localStorage.getItem('ankasms_username') || '';
+        let currentUsername = localStorage.getItem('sms_username') || '';
         let selectedProductData = null;
         let currentBalance = 0;
 
@@ -621,7 +655,7 @@ app.get('/', (req, res) => {
             const json = await res.json();
             if(json.success) {
                 currentUsername = json.username;
-                localStorage.setItem('ankasms_username', currentUsername);
+                localStorage.setItem('sms_username', currentUsername);
                 alert(json.message);
                 closeAuthModal();
                 fetchInitialData();
@@ -640,7 +674,7 @@ app.get('/', (req, res) => {
             const json = await res.json();
             if(json.success) {
                 currentUsername = json.username;
-                localStorage.setItem('ankasms_username', currentUsername);
+                localStorage.setItem('sms_username', currentUsername);
                 alert(json.message);
                 closeAuthModal();
                 fetchInitialData();
