@@ -11,14 +11,21 @@ app.use(express.urlencoded({ extended: true }));
 
 const API_KEY = 'osms_24a366588a5adf689da78bd656ef845effba51b53754bf57';
 const API_URL = 'https://onaylasms.com.tr/stubs/handler_api.php';
-const TELEGRAM_BOT_TOKEN = '8874989367:AAG-R1nZEN0Brx0cbB1--G3dYxyCMrwLuPg';
+// Yeni ve güncel token:
+const TELEGRAM_BOT_TOKEN = '8874989367:AAEw7YZYePXbQ2b04eFwTr5A9oYJLM7kStw';
 const TELEGRAM_CHAT_ID = '8964930489';
 
 let bot;
 try {
-    bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
+    bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: { interval: 2000, timeout: 10 } });
+    // Eski çakışma sinyallerini yakala
+    bot.on('polling_error', (error) => {
+        if (error.code === 'ETELEGRAM' && error.message.includes('409 Conflict')) {
+            console.log('Bot çakışması algılandı, yeniden bağlanılıyor...');
+        }
+    });
 } catch (error) {
-    console.log('Telegram bot hatası:', error.message);
+    console.log('Telegram bot başlatma hatası:', error.message);
 }
 
 // Veritabanı ve Ziyaretçi İstatistikleri
@@ -27,14 +34,13 @@ let users = {
 };
 let pendingPayments = {}; 
 let activeNumbers = [];   
-let siteVisitors = []; // Kimin geldiğini tutan liste
+let siteVisitors = []; 
 
 // Ziyaretçi Kayıt Sistemi
 app.use((req, res, next) => {
     if (req.path === '/' && req.method === 'GET') {
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Bilinmeyen IP';
         const time = new Date().toLocaleString('tr-TR');
-        // Son 50 ziyareti sakla
         siteVisitors.unshift({ ip, time });
         if (siteVisitors.length > 50) siteVisitors.pop();
     }
@@ -72,7 +78,6 @@ app.post('/api/auth/register', (req, res) => {
     res.json({ success: true, message: 'Kayıt başarılı!', username, balance: 25.00, role });
 });
 
-// Admin Paneli İstatistik ve Ziyaretçi API'leri
 app.get('/api/admin/getStats', (req, res) => {
     const { adminUsername } = req.query;
     if (!users[adminUsername] || users[adminUsername].role !== 'admin') return res.status(403).json({ success: false });
@@ -102,7 +107,7 @@ app.post('/api/admin/processPayment', (req, res) => {
     }
 });
 
-// STOK SORUNUNU ÇÖZEN AKILLI NUMARA ÇEKME MOTORU
+// STOK SORUNUNU AŞAN AKILLI NUMARA ÇEKME MOTORU
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 app.post('/api/buyNumber', async (req, res) => {
     const { productKey, username } = req.body;
@@ -110,25 +115,16 @@ app.post('/api/buyNumber', async (req, res) => {
     const product = ankaCatalog.find(s => s.id === productKey);
     if (!product || users[username].balance < product.price) return res.status(400).json({ success: false, message: 'Yetersiz bakiye veya geçersiz ürün.' });
 
-    // API stok sorununu aşmak için farklı operatör ve deneme döngüsü
     let successData = null;
-    for (let attempt = 1; attempt <= 5; attempt++) {
+    for (let attempt = 1; attempt <= 6; attempt++) {
         try {
-            // Önce normal istek
             let response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getNumber&service=${product.service}&country=${product.country}&operator=any`, { timeout: 5000 });
             let text = String(response.data).trim();
+            if (text.startsWith('ACCESS_NUMBER')) { successData = text; break; }
 
-            if (text.startsWith('ACCESS_NUMBER')) {
-                successData = text;
-                break;
-            }
-            // Eğer ilk denemede operator=any vermezse boş deneyelim
             response = await axios.get(`${API_URL}?api_key=${API_KEY}&action=getNumber&service=${product.service}&country=${product.country}`, { timeout: 5000 });
             text = String(response.data).trim();
-            if (text.startsWith('ACCESS_NUMBER')) {
-                successData = text;
-                break;
-            }
+            if (text.startsWith('ACCESS_NUMBER')) { successData = text; break; }
         } catch (e) {}
         await sleep(1500);
     }
@@ -142,7 +138,7 @@ app.post('/api/buyNumber', async (req, res) => {
         return res.json({ success: true, activationId, phoneNumber, remainingBalance: users[username].balance });
     }
 
-    res.status(400).json({ success: false, message: 'Şu an yoğunluk var veya stok gecikmeli dönüyor. Lütfen 5 saniye sonra tekrar deneyin.' });
+    res.status(400).json({ success: false, message: 'Şu an API stoklarında yoğunluk var. Lütfen 5 saniye sonra tekrar deneyin.' });
 });
 
 app.get('/api/checkSms/:activationId', async (req, res) => {
@@ -194,7 +190,7 @@ if (bot) {
     });
 }
 
-// ORİJİNAL, BOZULMAMIŞ ŞIK ARAYÜZ (HTML)
+// ARAYÜZ (HTML)
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="tr" class="dark">
@@ -235,7 +231,7 @@ app.get('/', (req, res) => {
         </div>
     </main>
 
-    <!-- Admin Modal (Ziyaretçiler ve Ödemeler) -->
+    <!-- Admin Modal -->
     <div id="admin-m" class="fixed inset-0 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl p-6 rounded-3xl relative max-h-[85vh] overflow-y-auto shadow-2xl">
             <button onclick="closeAdmin()" class="absolute top-5 right-5 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -339,7 +335,7 @@ app.get('/', (req, res) => {
             const sr = await fetch('/api/admin/getStats?adminUsername=' + user);
             const sj = await sr.json();
             if(sj.success) {
-                document.getElementById('admin-visitors').innerHTML = sj.visitors.length ? sj.visitors.map(v => \`<div class="flex justify-between border-b border-slate-900 pb-1"><span>IP: \${v.ip}</span><span class="text-slate-500">\${v.time}</span></div>\`).join('') : '<p class="text-slate-500">Henüz ziyaretçi yok.</p>';
+                document.getElementById('admin-visitors').innerHTML = sj.visitors.length ? sj.visitors.map(v => \`<div class="flex justify-between border-b border-slate-950 pb-1"><span>IP: \${v.ip}</span><span class="text-slate-500">\${v.time}</span></div>\`).join('') : '<p class="text-slate-500">Henüz ziyaretçi yok.</p>';
             }
 
             const pr = await fetch('/api/admin/getPendingPayments?adminUsername=' + user);
