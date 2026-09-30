@@ -1,16 +1,13 @@
 {
-  "name": "ankasms",
+  "name": "anka-sms",
   "version": "1.0.0",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "axios": "^1.7.0",
-    "bcryptjs": "^2.4.3",
-    "express": "^4.19.0",
-    "express-rate-limit": "^7.4.0",
-    "helmet": "^7.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.12.0"
+    "axios": "^1.6.0",
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.66.0"
   }
 }
